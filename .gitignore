@@ -20,3 +20,8 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Local image resources (large binary files, not needed in repo)
+resources/
+resources-upscaled/
+resources-upscaled-ai/
