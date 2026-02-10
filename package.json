@@ -1,0 +1,14 @@
+{
+  "name": "jewellery-inventory-manager",
+  "version": "1.0.0",
+  "description": "Jewellery inventory management system with Airtable integration.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "airtable": "^0.11.1",
+    "express": "^4.18.2",
+    "dotenv": "^16.0.3"
+  }
+}
