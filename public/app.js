@@ -80,12 +80,12 @@ async function performAISearch() {
   
   if (!query) {
     statusEl.textContent = '⚠️ Please enter a search query';
-    statusEl.style.color = '#ffeb3b';
+    statusEl.style.color = '#856404';
     return;
   }
   
   statusEl.textContent = '🔍 Searching...';
-  statusEl.style.color = 'white';
+  statusEl.style.color = '#6c757d';
   
   try {
     const response = await fetch('/api/ai-search', {
@@ -108,10 +108,10 @@ async function performAISearch() {
     
     if (filteredItems.length === 0) {
       statusEl.textContent = '❌ No items found for your search';
-      statusEl.style.color = '#ffeb3b';
+      statusEl.style.color = '#856404';
     } else {
       statusEl.textContent = `✅ Found ${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`;
-      statusEl.style.color = '#4caf50';
+      statusEl.style.color = '#28a745';
     }
     
     displayItems(filteredItems);
@@ -119,7 +119,7 @@ async function performAISearch() {
   } catch (err) {
     console.error('AI Search error:', err);
     statusEl.textContent = `❌ Error: ${err.message}`;
-    statusEl.style.color = '#ff5252';
+    statusEl.style.color = '#dc3545';
   }
 }
 
