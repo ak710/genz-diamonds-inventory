@@ -4,6 +4,7 @@ let scannedItems = [];
 let scanAudio = null;
 let authToken = localStorage.getItem('authToken') || null;
 let customerMode = localStorage.getItem('customerMode') === 'true' || false;
+let combineMode = false;
 
 // Check if user is authenticated
 if (!authToken && window.location.pathname !== '/login.html' && !window.location.pathname.endsWith('login.html')) {
@@ -170,13 +171,15 @@ function populateFilters() {
 
 // Apply filters
 function applyFilters() {
+  combineMode = document.getElementById('combineToggle').checked;
+  
   const prefix = document.getElementById('filterPrefix').value;
   const minPrice = parseFloat(document.getElementById('filterMinPrice').value) || 0;
   const maxPrice = parseFloat(document.getElementById('filterMaxPrice').value) || Infinity;
   const purity = document.getElementById('filterPurity').value;
   const sortBy = document.getElementById('sortBy').value;
   
-  filteredItems = allItems.filter(item => {
+  let items = allItems.filter(item => {
     const f = item.fields;
     const price = f['Tag Price Rounded (CAD)'] || 0;
     
@@ -187,21 +190,39 @@ function applyFilters() {
     return true;
   });
   
+  // Apply combining if enabled
+  if (combineMode) {
+    const combinedMap = {};
+    items.forEach(item => {
+      const design = item.fields['Design'] || 'Unknown';
+      if (!combinedMap[design]) {
+        combinedMap[design] = {
+          ...item,
+          _combinedItems: [item]
+        };
+      } else {
+        combinedMap[design]._combinedItems.push(item);
+      }
+    });
+    items = Object.values(combinedMap);
+  }
+  
   // Apply sorting
   if (sortBy === 'price-low') {
-    filteredItems.sort((a, b) => {
+    items.sort((a, b) => {
       const priceA = a.fields['Tag Price Rounded (CAD)'] || 0;
       const priceB = b.fields['Tag Price Rounded (CAD)'] || 0;
       return priceA - priceB;
     });
   } else if (sortBy === 'price-high') {
-    filteredItems.sort((a, b) => {
+    items.sort((a, b) => {
       const priceA = a.fields['Tag Price Rounded (CAD)'] || 0;
       const priceB = b.fields['Tag Price Rounded (CAD)'] || 0;
       return priceB - priceA;
     });
   }
   
+  filteredItems = items;
   displayItems(filteredItems);
 }
 
@@ -236,6 +257,10 @@ function displayItems(items) {
     const imageUrl = hdImage || image || getPlaceholder();
     const fallbackUrl = image || getPlaceholder();
     
+    // Check if this is a combined item
+    const stock = item._combinedItems ? item._combinedItems.length : 1;
+    const stockDisplay = combineMode ? `<p><strong>Stock:</strong> ${stock}</p>` : '';
+    
     html += `
       <div class="item-card" onclick="showItemDetail('${item.id}')">
         <img src="${imageUrl}" alt="${design}" class="item-image" onerror="if(this.src !== '${fallbackUrl}') { this.src = '${fallbackUrl}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }">
@@ -243,6 +268,7 @@ function displayItems(items) {
           <h3>${design}</h3>
           <p><strong>Job No:</strong> ${jobNo}</p>
           <p><strong>Purity:</strong> ${purity} | <strong>Weight:</strong> ${weight}g</p>
+          ${stockDisplay}
           <p class="item-price">$${price} CAD</p>
           <div class="item-status ${isSold ? 'sold-out' : 'in-stock'}">
             ${isSold ? '❌ Sold Out' : '✓ In Stock'}
@@ -258,14 +284,20 @@ function displayItems(items) {
 
 // Show item detail when clicked
 function showItemDetail(recordId) {
-  const item = allItems.find(i => i.id === recordId);
+  let item = allItems.find(i => i.id === recordId);
+  if (!item) {
+    // If not found in allItems, check if it's in filteredItems (for combined mode)
+    item = filteredItems.find(i => i.id === recordId);
+  }
   if (!item) return;
+  
+  const combinedItems = item._combinedItems || null;
   
   const resultDiv = document.getElementById('browseResult');
   resultDiv.innerHTML = `
     <button onclick="loadAllItems()" style="margin-bottom: 1em;">← Back to Browse</button>
     <div class="detail-view">
-      ${renderRecord(item)}
+      ${renderRecord(item, combinedItems)}
     </div>
   `;
   window.scrollTo(0, 0);
@@ -290,7 +322,7 @@ document.getElementById('searchForm').addEventListener('submit', async function(
   }
 });
 
-function renderRecord(record) {
+function renderRecord(record, combinedItems = null) {
   const f = record.fields;
   let html = '<h2>Piece Details</h2>';
   
@@ -313,7 +345,15 @@ function renderRecord(record) {
   
   // Display key details in a table
   html += '<table style="border-collapse: collapse; margin-bottom: 1em;">';
-  html += '<tr><td><b>Job No.</b></td><td>' + (f['Job No.'] || '') + '</td></tr>';
+  
+  // Show combined job numbers if available
+  if (combinedItems) {
+    const jobNumbers = combinedItems.map(item => item.fields['Job No.']).join(', ');
+    html += '<tr><td><b>Job No.</b></td><td>' + jobNumbers + '</td></tr>';
+  } else {
+    html += '<tr><td><b>Job No.</b></td><td>' + (f['Job No.'] || '') + '</td></tr>';
+  }
+  
   html += '<tr><td><b>Design</b></td><td>' + (f['Design'] || '') + '</td></tr>';
   html += '<tr><td><b>Purity</b></td><td>' + (f['Purity'] || '') + '</td></tr>';
   html += '<tr><td><b>Gr. Wt.</b></td><td>' + (f['Gross Weight (Gr. Wt.)'] || '') + '</td></tr>';
