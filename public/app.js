@@ -410,7 +410,7 @@ function displayItems(items) {
     const selectionCheckbox = !customerMode ? `
       <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
         <input type="checkbox" id="linesheet-check-${item.id}" 
-               onchange="toggleLineSheetItem('${item.id}')" 
+               onchange="toggleLineSheetItem('${item.id}', event)" 
                ${isSelectedForLineSheet ? 'checked' : ''}
                style="width: 20px; height: 20px; cursor: pointer;">
       </div>
@@ -440,7 +440,7 @@ function displayItems(items) {
   resultDiv.innerHTML = html;
 }
 
-function toggleLineSheetItem(itemId) {
+function toggleLineSheetItem(itemId, event) {
   const checkbox = document.getElementById(`linesheet-check-${itemId}`);
   const isChecked = checkbox.checked;
   const item = filteredItems.find(i => i.id === itemId);
@@ -477,7 +477,9 @@ function toggleLineSheetItem(itemId) {
   }
   
   // Prevent event from bubbling to showItemDetail
-  event.stopPropagation();
+  if (event) {
+    event.stopPropagation();
+  }
 }
     item = allItems.find(i => i.id === recordId);
   }
