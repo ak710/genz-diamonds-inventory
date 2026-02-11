@@ -271,6 +271,18 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No items provided' });
     }
     
+    // Helper function to fetch image as buffer
+    async function fetchImage(url) {
+      if (!url) return null;
+      try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        return Buffer.from(response.data);
+      } catch (error) {
+        console.error(`Failed to fetch image ${url}:`, error.message);
+        return null;
+      }
+    }
+    
     if (format === 'docx') {
       // Generate Word document
       const logoPath = path.join(__dirname, 'public', 'assets', 'logo.png');
@@ -296,6 +308,145 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         ];
       }
       
+      // Fetch all images
+      const itemsWithImages = await Promise.all(items.map(async (item) => {
+        const imageBuffer = item.image ? await fetchImage(item.image) : null;
+        return { ...item, imageBuffer };
+      }));
+      
+      // Create 3-column table with borders
+      const itemsPerRow = 3;
+      const tableRows = [];
+      
+      for (let i = 0; i < itemsWithImages.length; i += itemsPerRow) {
+        const rowItems = itemsWithImages.slice(i, i + itemsPerRow);
+        
+        // Create a row with bordered cells
+        const tableCells = rowItems.map(item => {
+          const cellChildren = [];
+          
+          // Add image or placeholder
+          if (item.imageBuffer) {
+            cellChildren.push(
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 },
+                children: [
+                  new ImageRun({
+                    data: item.imageBuffer,
+                    transformation: {
+                      width: 150,
+                      height: 150
+                    }
+                  })
+                ]
+              })
+            );
+          } else {
+            cellChildren.push(
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 },
+                children: [
+                  new TextRun({
+                    text: '[No Image]',
+                    color: '999999',
+                    italics: true,
+                    size: 20
+                  })
+                ]
+              })
+            );
+          }
+          
+          // Add item details - left aligned
+          cellChildren.push(
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [
+                new TextRun({
+                  text: `SKU: ${item.design}`,
+                  bold: true,
+                  size: 20
+                })
+              ]
+            }),
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [
+                new TextRun({
+                  text: `Purity: ${item.purity || 'N/A'}`,
+                  size: 20
+                })
+              ]
+            }),
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [
+                new TextRun({
+                  text: `Set Cts.: ${item.setCts || 'N/A'}`,
+                  size: 20
+                })
+              ]
+            }),
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [
+                new TextRun({
+                  text: `Wholesale: $${item.wholesalePrice.toFixed(2)}`,
+                  bold: true,
+                  size: 20
+                })
+              ]
+            }),
+            new Paragraph({
+              spacing: { after: 100 },
+              children: [
+                new TextRun({
+                  text: `Suggested Retail: $${item.retailPrice.toFixed(2)}`,
+                  size: 20
+                })
+              ]
+            })
+          );
+          
+          return new TableCell({
+            children: cellChildren,
+            width: { size: 33, type: WidthType.PERCENTAGE },
+            margins: {
+              top: 100,
+              bottom: 100,
+              left: 100,
+              right: 100
+            },
+            borders: {
+              top: { style: 'single', size: 1, color: '000000' },
+              bottom: { style: 'single', size: 1, color: '000000' },
+              left: { style: 'single', size: 1, color: '000000' },
+              right: { style: 'single', size: 1, color: '000000' }
+            }
+          });
+        });
+        
+        // Fill empty cells if needed
+        while (tableCells.length < itemsPerRow) {
+          tableCells.push(
+            new TableCell({
+              children: [new Paragraph('')],
+              width: { size: 33, type: WidthType.PERCENTAGE },
+              borders: {
+                top: { style: 'single', size: 1, color: '000000' },
+                bottom: { style: 'single', size: 1, color: '000000' },
+                left: { style: 'single', size: 1, color: '000000' },
+                right: { style: 'single', size: 1, color: '000000' }
+              }
+            })
+          );
+        }
+        
+        tableRows.push(new TableRow({ children: tableCells }));
+      }
+      
       const doc = new Document({
         sections: [{
           properties: {},
@@ -305,75 +456,25 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               text: "LINE SHEET",
               heading: HeadingLevel.HEADING_1,
               alignment: AlignmentType.CENTER,
-              spacing: { after: 400 }
+              spacing: { after: 200 }
             }),
             new Paragraph({
               text: `Discount Applied: ${discountPercent}%`,
               alignment: AlignmentType.CENTER,
-              spacing: { after: 200 }
+              spacing: { after: 100 }
             }),
             new Paragraph({
               text: `Date: ${new Date().toLocaleDateString()}`,
               alignment: AlignmentType.CENTER,
               spacing: { after: 400 }
             }),
-            
-            // Create table header
             new Table({
               width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: "Design No.", bold: true })] })],
-                      width: { size: 20, type: WidthType.PERCENTAGE }
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: "Purity", bold: true })] })],
-                      width: { size: 15, type: WidthType.PERCENTAGE }
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: "Set Cts.", bold: true })] })],
-                      width: { size: 15, type: WidthType.PERCENTAGE }
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: "Wholesale Price", bold: true })] })],
-                      width: { size: 25, type: WidthType.PERCENTAGE }
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({ children: [new TextRun({ text: "Suggested Retail", bold: true })] })],
-                      width: { size: 25, type: WidthType.PERCENTAGE }
-                    })
-                  ]
-                }),
-                // Add data rows
-                ...items.map(item => 
-                  new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph(item.design || 'N/A')],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph(item.purity || '')],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph(item.setCts?.toString() || '')],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph(`$${item.wholesalePrice.toFixed(2)} CAD`)],
-                      }),
-                      new TableCell({
-                        children: [new Paragraph(`$${item.retailPrice.toFixed(2)} CAD`)],
-                      })
-                    ]
-                  })
-                )
-              ]
+              rows: tableRows
             }),
-            
             new Paragraph({
               text: "",
-              spacing: { before: 400 }
+              spacing: { before: 200 }
             }),
             new Paragraph({
               children: [new TextRun({ text: "All prices are in Canadian Dollars (CAD)", italics: true })],
@@ -418,61 +519,117 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.moveDown(2);
       
-      // Table header
-      const tableTop = doc.y;
-      const colWidths = [100, 80, 80, 120, 120];
-      const headers = ['Design No.', 'Purity', 'Set Cts.', 'Wholesale Price', 'Suggested Retail'];
+      // Fetch all images
+      const itemsWithImages = await Promise.all(items.map(async (item) => {
+        const imageBuffer = item.image ? await fetchImage(item.image) : null;
+        return { ...item, imageBuffer };
+      }));
       
-      let x = 50;
-      doc.fontSize(10).font('Helvetica-Bold');
-      headers.forEach((header, i) => {
-        doc.text(header, x, tableTop, { width: colWidths[i], align: 'left' });
-        x += colWidths[i];
-      });
+      // Layout items in 3 columns with borders
+      const imageWidth = 150;
+      const imageHeight = 150;
+      const columnGap = 15;
+      const leftMargin = 40;
+      const boxWidth = (doc.page.width - leftMargin * 2 - columnGap * 2) / 3;
       
-      doc.moveDown();
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown(0.5);
+      let currentX = leftMargin;
+      let currentY = doc.y;
+      let itemsInCurrentRow = 0;
       
-      // Table rows
-      doc.font('Helvetica');
-      items.forEach((item, index) => {
-        const y = doc.y;
-        if (y > 700) {
+      for (let i = 0; i < itemsWithImages.length; i++) {
+        const item = itemsWithImages[i];
+        
+        // Check if we need a new page
+        if (currentY > 650) {
           doc.addPage();
-          
-          // Add logo to new page
-          if (fs.existsSync(logoPath)) {
-            const logoWidth = 100;
-            const logoHeight = 50;
-            const xPosition = (doc.page.width - logoWidth) / 2;
-            doc.image(logoPath, xPosition, 40, { width: logoWidth, height: logoHeight });
-            doc.moveDown(3);
-          }
+          currentY = 50;
+          currentX = leftMargin;
+          itemsInCurrentRow = 0;
         }
         
-        x = 50;
-        const rowData = [
-          item.design || 'N/A',
-          item.purity || '',
-          item.setCts?.toString() || '',
-          `$${item.wholesalePrice.toFixed(2)}`,
-          `$${item.retailPrice.toFixed(2)}`
-        ];
+        // Draw border box
+        const boxHeight = 320;
+        doc.rect(currentX, currentY, boxWidth, boxHeight).stroke('#000000');
         
-        rowData.forEach((data, i) => {
-          doc.text(data, x, doc.y, { width: colWidths[i], align: 'left', continued: i < rowData.length - 1 });
-          x += colWidths[i];
+        // Draw image or placeholder
+        const imagePadding = 10;
+        const imageX = currentX + (boxWidth - imageWidth) / 2;
+        const imageY = currentY + imagePadding;
+        
+        if (item.imageBuffer) {
+          try {
+            doc.image(item.imageBuffer, imageX, imageY, { 
+              width: imageWidth, 
+              height: imageHeight,
+              fit: [imageWidth, imageHeight],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (err) {
+            // Draw placeholder if image fails
+            doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#cccccc');
+            doc.fillColor('#999999').fontSize(9).text('No Image', imageX, imageY + imageHeight / 2 - 5, {
+              width: imageWidth,
+              align: 'center'
+            });
+            doc.fillColor('#000000');
+          }
+        } else {
+          // Draw gray placeholder box
+          doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#cccccc');
+          doc.fillColor('#999999').fontSize(9).text('No Image', imageX, imageY + imageHeight / 2 - 5, {
+            width: imageWidth,
+            align: 'center'
+          });
+          doc.fillColor('#000000');
+        }
+        
+        // Add item details below image - left aligned
+        const detailsX = currentX + 10;
+        const detailsY = imageY + imageHeight + 15;
+        const textWidth = boxWidth - 20;
+        
+        doc.fontSize(10).font('Helvetica-Bold').text(`SKU: ${item.design}`, detailsX, detailsY, {
+          width: textWidth,
+          align: 'left'
+        });
+        doc.fontSize(9).font('Helvetica').text(`Purity: ${item.purity || 'N/A'}`, detailsX, detailsY + 14, {
+          width: textWidth,
+          align: 'left'
+        });
+        doc.text(`Set Cts.: ${item.setCts || 'N/A'}`, detailsX, detailsY + 28, {
+          width: textWidth,
+          align: 'left'
+        });
+        doc.font('Helvetica-Bold').text(`Wholesale: $${item.wholesalePrice.toFixed(2)}`, detailsX, detailsY + 42, {
+          width: textWidth,
+          align: 'left'
+        });
+        doc.font('Helvetica').text(`Suggested Retail: $${item.retailPrice.toFixed(2)}`, detailsX, detailsY + 56, {
+          width: textWidth,
+          align: 'left'
         });
         
-        doc.moveDown();
-      });
+        // Move to next column
+        itemsInCurrentRow++;
+        if (itemsInCurrentRow >= 3) {
+          // Move to next row
+          currentX = leftMargin;
+          currentY += boxHeight + 15;
+          itemsInCurrentRow = 0;
+        } else {
+          // Move to next column
+          currentX += boxWidth + columnGap;
+        }
+      }
+      
+      // Set doc.y for footer
+      doc.y = currentY + (itemsInCurrentRow > 0 ? 340 : 20);
       
       // Footer
-      doc.moveDown(2);
       doc.fontSize(9).font('Helvetica-Oblique');
-      doc.text('All prices are in Canadian Dollars (CAD)', { align: 'center' });
-      doc.text('Suggested retail price is calculated at 2.5x wholesale price', { align: 'center' });
+      doc.text('All prices are in Canadian Dollars (CAD)', leftMargin, doc.y, { align: 'center', width: doc.page.width - leftMargin * 2 });
+      doc.text('Suggested retail price is calculated at 2.5x wholesale price', leftMargin, doc.y + 12, { align: 'center', width: doc.page.width - leftMargin * 2 });
       
       doc.end();
     } else {

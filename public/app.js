@@ -983,14 +983,12 @@ async function generateLineSheet() {
       const retailPrice = roundToNearest5(discountedPrice * 2.5);
       
       return {
-        image: f['HD Image']?.[0]?.url || f['Image']?.[0]?.url || '',
+        image: f['HD Image']?.[0]?.url || f['Image']?.[0]?.url || null,
         design: f['Design'] || 'N/A',
         purity: f['Purity'] || '',
         setCts: f['Set Cts.'] || '',
         wholesalePrice: discountedPrice,
-        retailPrice: retailPrice,
-        tagPrice: tagPrice,
-        discountPercent: discountPercent
+        retailPrice: retailPrice
       };
     });
   
