@@ -3,6 +3,7 @@ let filteredItems = [];
 let scannedItems = [];
 let scanAudio = null;
 let authToken = localStorage.getItem('authToken') || null;
+let customerMode = localStorage.getItem('customerMode') === 'true' || false;
 
 // Check if user is authenticated
 if (!authToken && window.location.pathname !== '/login.html' && !window.location.pathname.endsWith('login.html')) {
@@ -24,6 +25,39 @@ function logout() {
   authToken = null;
   window.location.href = '/login.html';
 }
+
+// Toggle customer mode
+function toggleCustomerMode() {
+  customerMode = !customerMode;
+  localStorage.setItem('customerMode', customerMode);
+  
+  // Hide/show inventory tab
+  const inventoryTab = document.querySelector('.tab:nth-child(3)');
+  if (inventoryTab) {
+    inventoryTab.style.display = customerMode ? 'none' : 'block';
+  }
+  
+  // If currently on inventory tab and switching to customer mode, switch to browse
+  if (customerMode && document.getElementById('inventoryTab').classList.contains('active')) {
+    switchTab('browse');
+  }
+}
+
+// Initialize mode on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('customerModeToggle');
+  if (toggle) {
+    toggle.checked = customerMode;
+  }
+  
+  // Hide inventory tab on initial load if in customer mode
+  if (customerMode) {
+    const inventoryTab = document.querySelector('.tab:nth-child(3)');
+    if (inventoryTab) {
+      inventoryTab.style.display = 'none';
+    }
+  }
+});
 
 // Image Modal functions
 function openImageModal(imageUrl) {
@@ -285,30 +319,43 @@ function renderRecord(record) {
   html += '<tr><td><b>Gr. Wt.</b></td><td>' + (f['Gross Weight (Gr. Wt.)'] || '') + '</td></tr>';
   html += '<tr><td><b>Set Pcs.</b></td><td>' + (f['Set Pcs.'] || '') + '</td></tr>';
   html += '<tr><td><b>Set Cts.</b></td><td>' + (f['Set Cts.'] || '') + '</td></tr>';
-  html += '<tr><td><b>Tag Price (USD)</b></td><td>' + (f['Tag Price (USD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>Tag Price Rounded (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>15% Discount</b></td><td>' + (f['15% Discount Price (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>20% Discount</b></td><td>' + (f['20% Discount Price (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>25% Discount</b></td><td>' + (f['25% Discount Price (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>33% Discount</b></td><td>' + (f['33% Discount Price (CAD)'] || '') + '</td></tr>';
-  html += '<tr><td><b>DIA Cts</b></td><td>' + (f['DIA Cts'] || '') + '</td></tr>';
-  html += '<tr><td><b>LGD Cts</b></td><td>' + (f['LGD Cts'] || '') + '</td></tr>';
+  
+  // Only show these fields in staff mode (not customer mode)
+  if (!customerMode) {
+    html += '<tr><td><b>Tag Price (USD)</b></td><td>' + (f['Tag Price (USD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price Rounded (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>15% Discount</b></td><td>' + (f['15% Discount Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>20% Discount</b></td><td>' + (f['20% Discount Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>25% Discount</b></td><td>' + (f['25% Discount Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>33% Discount</b></td><td>' + (f['33% Discount Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>DIA Cts</b></td><td>' + (f['DIA Cts'] || '') + '</td></tr>';
+    html += '<tr><td><b>LGD Cts</b></td><td>' + (f['LGD Cts'] || '') + '</td></tr>';
+  } else {
+    // Customer mode - show only Tag Price Rounded (CAD) renamed
+    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
+  }
+  
   html += '</table>';
   
-  // Add edit form for sale status and buyer info
-  html += `
-    <h3>Update Sale Information</h3>
-    <form id="editForm" style="margin-top: 1em;">
-      <label style="display: block; margin-top: 0.5em;"><input type="checkbox" name="Sold" ${f['Sold'] ? 'checked' : ''}> Sold</label>
-      <label style="display: block; margin-top: 0.5em;">Buyer Name: <input type="text" name="Buyer Name" value="${f['Buyer Name'] || ''}" style="margin-left: 0.5em;"></label>
-      <label style="display: block; margin-top: 0.5em;">Sale Date: <input type="date" name="Sale Date" value="${f['Sale Date'] || ''}" style="margin-left: 0.5em;"></label>
-      <label style="display: block; margin-top: 0.5em;">Sale Price (CAD): <input type="number" name="Sale Price" value="${f['Sale Price'] || ''}" style="margin-left: 0.5em;"></label>
-      <button type="submit" style="margin-top: 1em;">Update</button>
-    </form>
-    <div id="updateMsg" style="margin-top: 1em; font-weight: bold;"></div>
-  `;
-  setTimeout(() => attachEditHandler(record.id), 0);
+  // Only show edit form in staff mode
+  if (!customerMode) {
+    html += `
+      <h3>Update Sale Information</h3>
+      <form id="editForm" style="margin-top: 1em;">
+        <label style="display: block; margin-top: 0.5em;"><input type="checkbox" name="Sold" ${f['Sold'] ? 'checked' : ''}> Sold</label>
+        <label style="display: block; margin-top: 0.5em;">Buyer Name: <input type="text" name="Buyer Name" value="${f['Buyer Name'] || ''}" style="margin-left: 0.5em;"></label>
+        <label style="display: block; margin-top: 0.5em;">Sale Date: <input type="date" name="Sale Date" value="${f['Sale Date'] || ''}" style="margin-left: 0.5em;"></label>
+        <label style="display: block; margin-top: 0.5em;">Sale Price (CAD): <input type="number" name="Sale Price" value="${f['Sale Price'] || ''}" style="margin-left: 0.5em;"></label>
+        <button type="submit" style="margin-top: 1em;">Update</button>
+      </form>
+      <div id="updateMsg" style="margin-top: 1em; font-weight: bold;"></div>
+    `;
+  }
+  
+  if (!customerMode) {
+    setTimeout(() => attachEditHandler(record.id), 0);
+  }
   return html;
 }
 
