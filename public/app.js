@@ -184,6 +184,26 @@ function switchTab(tab) {
   } else if (tab === 'search') {
     document.querySelector('.tab:nth-child(2)').classList.add('active');
     document.getElementById('searchTab').classList.add('active');
+  } else if (tab === 'linesheet') {
+    document.querySelector('.tab:nth-child(3)').classList.add('active');
+    document.getElementById('linesheetTab').classList.add('active');
+    if (allItems.length === 0) {
+      loadAllItems().then(() => loadLineSheetItems());
+    } else {
+      loadLineSheetItems();
+    }
+  } else if (tab === 'inventory') {
+    document.querySelector('.tab:nth-child(4)').classList.add('active');
+    document.getElementById('inventoryTab').classList.add('active');
+    document.getElementById('inventoryScan').focus();
+  }
+}
+    document.querySelector('.tab:nth-child(1)').classList.add('active');
+    document.getElementById('browseTab').classList.add('active');
+    if (allItems.length === 0) loadAllItems();
+  } else if (tab === 'search') {
+    document.querySelector('.tab:nth-child(2)').classList.add('active');
+    document.getElementById('searchTab').classList.add('active');
     document.getElementById('barcode').focus();
   } else if (tab === 'inventory') {
     document.querySelector('.tab:nth-child(3)').classList.add('active');
@@ -799,4 +819,188 @@ function exportInventory() {
   a.download = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Line Sheet Generator Functions
+let lineSheetItems = [];
+let selectedLineSheetItems = new Set();
+
+async function loadLineSheetItems() {
+  try {
+    const response = await fetch('/api/items');
+    const records = await response.json();
+    
+    lineSheetItems = records.map(record => ({
+      id: record.id,
+      fields: record.fields
+    }));
+    
+    renderLineSheetItems();
+  } catch (error) {
+    console.error('Error loading items for line sheet:', error);
+  }
+}
+
+function renderLineSheetItems() {
+  const container = document.getElementById('linesheet-items');
+  container.innerHTML = '';
+  
+  lineSheetItems.forEach(item => {
+    const f = item.fields;
+    const div = document.createElement('div');
+    div.className = 'form-check mb-2 p-2 border rounded';
+    div.style.backgroundColor = selectedLineSheetItems.has(item.id) ? '#e7f3ff' : '#ffffff';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'form-check-input';
+    checkbox.id = `item-${item.id}`;
+    checkbox.checked = selectedLineSheetItems.has(item.id);
+    checkbox.onchange = () => toggleLineSheetItem(item.id);
+    
+    const label = document.createElement('label');
+    label.className = 'form-check-label w-100';
+    label.htmlFor = `item-${item.id}`;
+    label.style.cursor = 'pointer';
+    
+    const imageUrl = f['HD Image']?.[0]?.url || f['Image']?.[0]?.url || '';
+    const imageHtml = imageUrl ? `<img src="${imageUrl}" style="width: 50px; height: 50px; object-fit: cover; margin-right: 10px; border-radius: 4px;">` : '';
+    
+    label.innerHTML = `
+      <div class="d-flex align-items-center">
+        ${imageHtml}
+        <div>
+          <strong>${f['Design'] || 'N/A'}</strong> - ${f['Purity'] || ''} 
+          <br>
+          <small>Tag Price: $${f['Tag Price (CAD)'] || 'N/A'}</small>
+        </div>
+      </div>
+    `;
+    
+    div.appendChild(checkbox);
+    div.appendChild(label);
+    container.appendChild(div);
+  });
+  
+  updateSelectedCount();
+}
+
+function toggleLineSheetItem(itemId) {
+  if (selectedLineSheetItems.has(itemId)) {
+    selectedLineSheetItems.delete(itemId);
+  } else {
+    selectedLineSheetItems.add(itemId);
+  }
+  renderLineSheetItems();
+}
+
+function selectAllLineSheet() {
+  lineSheetItems.forEach(item => selectedLineSheetItems.add(item.id));
+  renderLineSheetItems();
+}
+
+function clearLineSheetSelection() {
+  selectedLineSheetItems.clear();
+  renderLineSheetItems();
+}
+
+function updateSelectedCount() {
+  const count = selectedLineSheetItems.size;
+  document.getElementById('selected-count').textContent = count;
+}
+
+function toggleCustomDiscount() {
+  const discountType = document.querySelector('input[name="discount-type"]:checked').value;
+  const customDiscountInput = document.getElementById('custom-discount');
+  customDiscountInput.disabled = discountType !== 'custom';
+  if (discountType !== 'custom') {
+    customDiscountInput.value = '';
+  }
+}
+
+function roundToNearest5(price) {
+  return Math.round(price / 5) * 5;
+}
+
+async function generateLineSheet() {
+  if (selectedLineSheetItems.size === 0) {
+    alert('Please select at least one item for the line sheet.');
+    return;
+  }
+  
+  const discountType = document.querySelector('input[name="discount-type"]:checked').value;
+  let discountPercent = 0;
+  
+  if (discountType === 'custom') {
+    discountPercent = parseFloat(document.getElementById('custom-discount').value) || 0;
+    if (discountPercent <= 0 || discountPercent >= 100) {
+      alert('Please enter a valid discount percentage between 0 and 100.');
+      return;
+    }
+  } else {
+    discountPercent = parseInt(discountType);
+  }
+  
+  const exportFormat = document.getElementById('export-format').value;
+  
+  // Prepare selected items data
+  const selectedItems = lineSheetItems
+    .filter(item => selectedLineSheetItems.has(item.id))
+    .map(item => {
+      const f = item.fields;
+      const tagPrice = f['Tag Price (CAD)'] || 0;
+      const discountedPrice = roundToNearest5(tagPrice * (1 - discountPercent / 100));
+      const retailPrice = roundToNearest5(discountedPrice * 2.5);
+      
+      return {
+        image: f['HD Image']?.[0]?.url || f['Image']?.[0]?.url || '',
+        design: f['Design'] || 'N/A',
+        purity: f['Purity'] || '',
+        setCts: f['Set Cts.'] || '',
+        wholesalePrice: discountedPrice,
+        retailPrice: retailPrice,
+        tagPrice: tagPrice,
+        discountPercent: discountPercent
+      };
+    });
+  
+  try {
+    const button = document.querySelector('#linesheet button');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Generating...';
+    
+    const response = await fetch('/api/generate-linesheet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        items: selectedItems,
+        format: exportFormat,
+        discountPercent: discountPercent
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to generate line sheet');
+    }
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linesheet_${new Date().toISOString().slice(0, 10)}.${exportFormat}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    button.disabled = false;
+    button.textContent = originalText;
+  } catch (error) {
+    console.error('Error generating line sheet:', error);
+    alert('Failed to generate line sheet. Please try again.');
+    const button = document.querySelector('#linesheet button');
+    button.disabled = false;
+    button.textContent = 'Generate Line Sheet';
+  }
 }

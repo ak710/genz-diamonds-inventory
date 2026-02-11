@@ -411,6 +411,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('browse')">Browse All</button>
       <button class="tab" onclick="switchTab('search')">Search by Barcode</button>
+      <button class="tab" onclick="switchTab('linesheet')">Line Sheet</button>
       <button class="tab" onclick="switchTab('inventory')">Take Inventory</button>
     </div>
     
@@ -536,6 +537,81 @@
         </div>
         
         <div id="scannedItems" class="scanned-items"></div>
+      </div>
+    </div>
+
+    <!-- Line Sheet Tab -->
+    <div id="linesheetTab" class="tab-content">
+      <div class="inventory-section">
+        <div class="inventory-header">
+          <h2>Line Sheet Generator</h2>
+          <p style="color: #666;">Select items and pricing to generate a professional line sheet</p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 1.5em; border-radius: 8px; margin-bottom: 2em; border: 1px solid #dee2e6;">
+          <h3 style="margin-top: 0; font-size: 1.1em;">Pricing Options</h3>
+          
+          <div style="display: flex; gap: 2em; flex-wrap: wrap; margin-bottom: 1.5em;">
+            <label style="display: flex; align-items: center; gap: 0.5em;">
+              <input type="radio" name="pricingType" value="preset" checked onchange="toggleCustomDiscount()">
+              <span>Use Preset Discount</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5em;">
+              <input type="radio" name="pricingType" value="custom" onchange="toggleCustomDiscount()">
+              <span>Custom Discount %</span>
+            </label>
+          </div>
+
+          <div id="presetDiscounts" style="display: flex; gap: 1em; flex-wrap: wrap;">
+            <label style="padding: 0.5em 1em; border: 2px solid #dee2e6; border-radius: 5px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="discount" value="15" checked> 15% Off
+            </label>
+            <label style="padding: 0.5em 1em; border: 2px solid #dee2e6; border-radius: 5px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="discount" value="20"> 20% Off
+            </label>
+            <label style="padding: 0.5em 1em; border: 2px solid #dee2e6; border-radius: 5px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="discount" value="25"> 25% Off
+            </label>
+            <label style="padding: 0.5em 1em; border: 2px solid #dee2e6; border-radius: 5px; cursor: pointer; transition: all 0.2s;">
+              <input type="radio" name="discount" value="33"> 33% Off
+            </label>
+          </div>
+
+          <div id="customDiscount" style="display: none; margin-top: 1em;">
+            <label style="display: block; margin-bottom: 0.5em; font-weight: 500;">Custom Discount %:</label>
+            <input type="number" id="customDiscountValue" min="0" max="100" step="1" placeholder="Enter discount %" 
+                   style="padding: 0.5em; font-size: 1em; border: 1px solid #ced4da; border-radius: 4px; width: 200px;">
+          </div>
+
+          <div style="margin-top: 1.5em;">
+            <label style="display: block; margin-bottom: 0.5em; font-weight: 500;">Export Format:</label>
+            <select id="exportFormat" style="padding: 0.5em; font-size: 1em; border: 1px solid #ced4da; border-radius: 4px;">
+              <option value="docx">Microsoft Word (.docx)</option>
+              <option value="pdf">PDF (.pdf)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2em;">
+          <h3>Select Items</h3>
+          <div style="display: flex; gap: 1em; margin-bottom: 1em;">
+            <button onclick="selectAllLineSheet()" class="btn-secondary">Select All</button>
+            <button onclick="clearLineSheetSelection()" class="btn-secondary">Clear Selection</button>
+          </div>
+          <div id="linesheetItemsList" style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 5px; padding: 1em; background: white;">
+            <p style="color: #666; text-align: center;">Loading items...</p>
+          </div>
+        </div>
+
+        <div style="background: #e7f3ff; padding: 1em; border-radius: 5px; margin-bottom: 1em; border-left: 4px solid #007bff;">
+          <strong>Selected: <span id="selectedCount">0</span> items</strong>
+        </div>
+
+        <button onclick="generateLineSheet()" class="btn-primary" style="width: 100%; padding: 1em; font-size: 1.1em;">
+          Generate Line Sheet
+        </button>
+
+        <div id="linesheetStatus" style="margin-top: 1em; padding: 1em; border-radius: 5px; display: none;"></div>
       </div>
     </div>
   </div>

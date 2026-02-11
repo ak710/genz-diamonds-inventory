@@ -1,7 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const OpenAI = require('openai');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, VerticalAlign, WidthType, AlignmentType, HeadingLevel, ImageRun } = require('docx');
+const PDFDocument = require('pdfkit');
+const axios = require('axios');
 const app = express();
 
 app.use(express.json());
@@ -252,6 +256,231 @@ Formula:`;
     
   } catch (err) {
     console.error('❌ AI Search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate Line Sheet
+app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
+  try {
+    const { items, format, discountPercent } = req.body;
+    
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items provided' });
+    }
+    
+    if (format === 'docx') {
+      // Generate Word document
+      const logoPath = path.join(__dirname, 'public', 'assets', 'logo.png');
+      let logoChildren = [];
+      
+      // Add logo if it exists
+      if (fs.existsSync(logoPath)) {
+        const logoBuffer = fs.readFileSync(logoPath);
+        logoChildren = [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
+            children: [
+              new ImageRun({
+                data: logoBuffer,
+                transformation: {
+                  width: 200,
+                  height: 100
+                }
+              })
+            ]
+          })
+        ];
+      }
+      
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            ...logoChildren,
+            new Paragraph({
+              text: "LINE SHEET",
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            }),
+            new Paragraph({
+              text: `Discount Applied: ${discountPercent}%`,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 }
+            }),
+            new Paragraph({
+              text: `Date: ${new Date().toLocaleDateString()}`,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            }),
+            
+            // Create table header
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ text: "Design No.", bold: true })],
+                      width: { size: 20, type: WidthType.PERCENTAGE }
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: "Purity", bold: true })],
+                      width: { size: 15, type: WidthType.PERCENTAGE }
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: "Set Cts.", bold: true })],
+                      width: { size: 15, type: WidthType.PERCENTAGE }
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: "Wholesale Price", bold: true })],
+                      width: { size: 25, type: WidthType.PERCENTAGE }
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: "Suggested Retail", bold: true })],
+                      width: { size: 25, type: WidthType.PERCENTAGE }
+                    })
+                  ]
+                }),
+                // Add data rows
+                ...items.map(item => 
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph(item.design || 'N/A')],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph(item.purity || '')],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph(item.setCts?.toString() || '')],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph(`$${item.wholesalePrice.toFixed(2)} CAD`)],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph(`$${item.retailPrice.toFixed(2)} CAD`)],
+                      })
+                    ]
+                  })
+                )
+              ]
+            }),
+            
+            new Paragraph({
+              text: "",
+              spacing: { before: 400 }
+            }),
+            new Paragraph({
+              text: "All prices are in Canadian Dollars (CAD)",
+              italics: true,
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({
+              text: "Suggested retail price is calculated at 2.5x wholesale price",
+              italics: true,
+              alignment: AlignmentType.CENTER
+            })
+          ]
+        }]
+      });
+      
+      const buffer = await Packer.toBuffer(doc);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename=linesheet_${new Date().toISOString().slice(0, 10)}.docx`);
+      res.send(buffer);
+      
+    } else if (format === 'pdf') {
+      // Generate PDF document
+      const doc = new PDFDocument({ margin: 50 });
+      const logoPath = path.join(__dirname, 'public', 'assets', 'logo.png');
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=linesheet_${new Date().toISOString().slice(0, 10)}.pdf`);
+      
+      doc.pipe(res);
+      
+      // Add logo if it exists
+      if (fs.existsSync(logoPath)) {
+        const logoWidth = 150;
+        const logoHeight = 75;
+        const xPosition = (doc.page.width - logoWidth) / 2;
+        doc.image(logoPath, xPosition, 40, { width: logoWidth, height: logoHeight });
+        doc.moveDown(4);
+      }
+      
+      // Title
+      doc.fontSize(20).text('LINE SHEET', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(12).text(`Discount Applied: ${discountPercent}%`, { align: 'center' });
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.moveDown(2);
+      
+      // Table header
+      const tableTop = doc.y;
+      const colWidths = [100, 80, 80, 120, 120];
+      const headers = ['Design No.', 'Purity', 'Set Cts.', 'Wholesale Price', 'Suggested Retail'];
+      
+      let x = 50;
+      doc.fontSize(10).font('Helvetica-Bold');
+      headers.forEach((header, i) => {
+        doc.text(header, x, tableTop, { width: colWidths[i], align: 'left' });
+        x += colWidths[i];
+      });
+      
+      doc.moveDown();
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+      
+      // Table rows
+      doc.font('Helvetica');
+      items.forEach((item, index) => {
+        const y = doc.y;
+        if (y > 700) {
+          doc.addPage();
+          
+          // Add logo to new page
+          if (fs.existsSync(logoPath)) {
+            const logoWidth = 100;
+            const logoHeight = 50;
+            const xPosition = (doc.page.width - logoWidth) / 2;
+            doc.image(logoPath, xPosition, 40, { width: logoWidth, height: logoHeight });
+            doc.moveDown(3);
+          }
+        }
+        
+        x = 50;
+        const rowData = [
+          item.design || 'N/A',
+          item.purity || '',
+          item.setCts?.toString() || '',
+          `$${item.wholesalePrice.toFixed(2)}`,
+          `$${item.retailPrice.toFixed(2)}`
+        ];
+        
+        rowData.forEach((data, i) => {
+          doc.text(data, x, doc.y, { width: colWidths[i], align: 'left', continued: i < rowData.length - 1 });
+          x += colWidths[i];
+        });
+        
+        doc.moveDown();
+      });
+      
+      // Footer
+      doc.moveDown(2);
+      doc.fontSize(9).font('Helvetica-Oblique');
+      doc.text('All prices are in Canadian Dollars (CAD)', { align: 'center' });
+      doc.text('Suggested retail price is calculated at 2.5x wholesale price', { align: 'center' });
+      
+      doc.end();
+    } else {
+      return res.status(400).json({ error: 'Invalid format. Use "docx" or "pdf"' });
+    }
+    
+  } catch (err) {
+    console.error('❌ Line sheet generation error:', err);
     res.status(500).json({ error: err.message });
   }
 });
