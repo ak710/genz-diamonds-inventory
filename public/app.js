@@ -443,8 +443,22 @@ function renderRecord(record, combinedItems = null) {
   
   // Only show edit form in staff mode
   if (!customerMode) {
+    // Build dropdown for combined items
+    let jobDropdown = '';
+    if (combinedItems && combinedItems.length > 1) {
+      jobDropdown = `
+        <label style="display: block; margin-top: 0.5em;" for="jobSelect"><strong>Select Job to Update:</strong></label>
+        <select id="jobSelect" style="margin-left: 0.5em; padding: 0.5em;">
+      `;
+      combinedItems.forEach(item => {
+        jobDropdown += `<option value="${item.id}">${item.fields['Job No.']}</option>`;
+      });
+      jobDropdown += '</select>';
+    }
+    
     html += `
       <h3>Update Sale Information</h3>
+      ${jobDropdown}
       <form id="editForm" style="margin-top: 1em;">
         <label style="display: block; margin-top: 0.5em;"><input type="checkbox" name="Sold" ${f['Sold'] ? 'checked' : ''}> Sold</label>
         <label style="display: block; margin-top: 0.5em;">Buyer Name: <input type="text" name="Buyer Name" value="${f['Buyer Name'] || ''}" style="margin-left: 0.5em;"></label>
@@ -457,16 +471,24 @@ function renderRecord(record, combinedItems = null) {
   }
   
   if (!customerMode) {
-    setTimeout(() => attachEditHandler(record.id), 0);
+    setTimeout(() => attachEditHandler(record.id, combinedItems), 0);
   }
   return html;
 }
 
-function attachEditHandler(recordId) {
+function attachEditHandler(recordId, combinedItems) {
   const form = document.getElementById('editForm');
   if (!form) return;
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
+    
+    // If there's a job selector dropdown, use the selected value
+    const jobSelect = document.getElementById('jobSelect');
+    let selectedRecordId = recordId;
+    if (jobSelect) {
+      selectedRecordId = jobSelect.value;
+    }
+    
     const formData = new FormData(form);
     const payload = {
       Sold: formData.get('Sold') === 'on'
@@ -481,7 +503,7 @@ function attachEditHandler(recordId) {
     if (saleDate) payload['Sale Date'] = saleDate;
     if (salePrice) payload['Sale Price'] = parseFloat(salePrice);
     
-    const res = await fetch(`/api/update/${recordId}`, {
+    const res = await fetch(`/api/update/${selectedRecordId}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
