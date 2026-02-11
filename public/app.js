@@ -42,6 +42,17 @@ function toggleCustomerMode() {
   if (customerMode && document.getElementById('inventoryTab').classList.contains('active')) {
     switchTab('browse');
   }
+  
+  // Refresh current view based on active tab
+  if (document.getElementById('browseTab').classList.contains('active')) {
+    applyFilters(); // Re-render browse with updated customer mode
+  } else if (document.getElementById('searchTab').classList.contains('active')) {
+    // If viewing search results, refresh them
+    const barcode = document.getElementById('barcode').value.trim();
+    if (barcode) {
+      document.getElementById('searchForm').dispatchEvent(new Event('submit'));
+    }
+  }
 }
 
 // Initialize mode on page load
