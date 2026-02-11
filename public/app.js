@@ -1015,7 +1015,9 @@ async function generateLineSheet() {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to generate line sheet');
+      const errorText = await response.text();
+      console.error('Server error:', errorText);
+      throw new Error(`Failed to generate line sheet: ${response.status}`);
     }
     
     const blob = await response.blob();
@@ -1030,8 +1032,8 @@ async function generateLineSheet() {
     button.textContent = originalText;
   } catch (error) {
     console.error('Error generating line sheet:', error);
-    alert('Failed to generate line sheet. Please try again.');
-    const button = document.querySelector('#linesheet button');
+    alert(`Failed to generate line sheet: ${error.message}`);
+    const button = document.querySelector('#linesheetTab button.btn-primary');
     button.disabled = false;
     button.textContent = 'Generate Line Sheet';
   }

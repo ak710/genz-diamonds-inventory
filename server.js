@@ -265,6 +265,8 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
   try {
     const { items, format, discountPercent } = req.body;
     
+    console.log(`📄 Generating line sheet: ${items.length} items, format: ${format}, discount: ${discountPercent}%`);
+    
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
     }
@@ -323,23 +325,23 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ text: "Design No.", bold: true })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Design No.", bold: true })] })],
                       width: { size: 20, type: WidthType.PERCENTAGE }
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: "Purity", bold: true })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Purity", bold: true })] })],
                       width: { size: 15, type: WidthType.PERCENTAGE }
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: "Set Cts.", bold: true })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Set Cts.", bold: true })] })],
                       width: { size: 15, type: WidthType.PERCENTAGE }
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: "Wholesale Price", bold: true })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Wholesale Price", bold: true })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE }
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: "Suggested Retail", bold: true })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Suggested Retail", bold: true })] })],
                       width: { size: 25, type: WidthType.PERCENTAGE }
                     })
                   ]
@@ -374,13 +376,11 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               spacing: { before: 400 }
             }),
             new Paragraph({
-              text: "All prices are in Canadian Dollars (CAD)",
-              italics: true,
+              children: [new TextRun({ text: "All prices are in Canadian Dollars (CAD)", italics: true })],
               alignment: AlignmentType.CENTER
             }),
             new Paragraph({
-              text: "Suggested retail price is calculated at 2.5x wholesale price",
-              italics: true,
+              children: [new TextRun({ text: "Suggested retail price is calculated at 2.5x wholesale price", italics: true })],
               alignment: AlignmentType.CENTER
             })
           ]
@@ -481,6 +481,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
     
   } catch (err) {
     console.error('❌ Line sheet generation error:', err);
+    console.error('Error stack:', err.stack);
     res.status(500).json({ error: err.message });
   }
 });
