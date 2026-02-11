@@ -304,7 +304,12 @@ function displayItems(items) {
     const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 'N/A';
     const purity = f['Purity'] || '';
     const weight = f['Gross Weight (Gr. Wt.)'] || '';
-    const isSold = f['Sold'] === true;
+    
+    // For combined items, check if ALL are sold (only then show sold out)
+    let isSold = f['Sold'] === true;
+    if (combineMode && item._combinedItems) {
+      isSold = item._combinedItems.every(i => i.fields['Sold'] === true);
+    }
     
     // Use HD image first, fallback to regular image, then placeholder
     const imageUrl = hdImage || image || getPlaceholder();
