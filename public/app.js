@@ -198,14 +198,6 @@ function switchTab(tab) {
     document.getElementById('inventoryScan').focus();
   }
 }
-    document.getElementById('searchTab').classList.add('active');
-    document.getElementById('barcode').focus();
-  } else if (tab === 'inventory') {
-    document.querySelector('.tab:nth-child(3)').classList.add('active');
-    document.getElementById('inventoryTab').classList.add('active');
-    document.getElementById('inventoryScan').focus();
-  }
-}
 
 // Load all items for browse view
 async function loadAllItems() {
