@@ -416,6 +416,38 @@
     
     <!-- Browse All Tab -->
     <div id="browseTab" class="tab-content active">
+      <!-- AI Natural Language Search -->
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5em; border-radius: 8px; margin-bottom: 2em; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <div style="display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.75em;">
+          <span style="font-size: 1.5em;">🤖</span>
+          <h3 style="color: white; margin: 0; font-size: 1.1em;">AI Search</h3>
+        </div>
+        <div style="display: flex; gap: 0.75em;">
+          <input 
+            type="text" 
+            id="aiSearchInput" 
+            placeholder='Try "white gold rings", "emerald cut earrings", "solitaire rings over 2 carats"...'
+            style="flex: 1; padding: 0.75em; font-size: 1em; border: none; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+            onkeypress="if(event.key === 'Enter') performAISearch()"
+          />
+          <button 
+            onclick="performAISearch()" 
+            style="padding: 0.75em 2em; background: white; color: #667eea; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1em; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s;"
+            onmouseover="this.style.transform='scale(1.05)'"
+            onmouseout="this.style.transform='scale(1)'"
+          >
+            Search
+          </button>
+          <button 
+            onclick="clearAISearch()" 
+            style="padding: 0.75em 1.5em; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 5px; cursor: pointer; font-size: 1em;"
+          >
+            Clear
+          </button>
+        </div>
+        <div id="aiSearchStatus" style="margin-top: 0.75em; color: white; font-size: 0.9em; min-height: 20px;"></div>
+      </div>
+      
       <div class="filters">
         <div class="filter-group">
           <label>Design Prefix</label>

@@ -71,6 +71,67 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// AI Search functions
+let isAISearchActive = false;
+
+async function performAISearch() {
+  const query = document.getElementById('aiSearchInput').value.trim();
+  const statusEl = document.getElementById('aiSearchStatus');
+  
+  if (!query) {
+    statusEl.textContent = '⚠️ Please enter a search query';
+    statusEl.style.color = '#ffeb3b';
+    return;
+  }
+  
+  statusEl.textContent = '🔍 Searching...';
+  statusEl.style.color = 'white';
+  
+  try {
+    const response = await fetch('/api/ai-search', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ query })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Search failed');
+    }
+    
+    // Mark that AI search is active
+    isAISearchActive = true;
+    
+    // Display results
+    filteredItems = data.results || [];
+    
+    if (filteredItems.length === 0) {
+      statusEl.textContent = '❌ No items found for your search';
+      statusEl.style.color = '#ffeb3b';
+    } else {
+      statusEl.textContent = `✅ Found ${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`;
+      statusEl.style.color = '#4caf50';
+    }
+    
+    displayItems(filteredItems);
+    
+  } catch (err) {
+    console.error('AI Search error:', err);
+    statusEl.textContent = `❌ Error: ${err.message}`;
+    statusEl.style.color = '#ff5252';
+  }
+}
+
+function clearAISearch() {
+  document.getElementById('aiSearchInput').value = '';
+  document.getElementById('aiSearchStatus').textContent = '';
+  isAISearchActive = false;
+  
+  // Restore normal filtered view
+  applyFilters();
+}
+
 // Image Modal functions
 function openImageModal(imageUrl) {
   const modal = document.getElementById('imageModal');
