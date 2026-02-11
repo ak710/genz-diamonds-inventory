@@ -928,7 +928,10 @@ function clearLineSheetSelection() {
 
 function updateSelectedCount() {
   const count = selectedLineSheetItems.size;
-  document.getElementById('selected-count').textContent = count;
+  const element = document.getElementById('selectedCount');
+  if (element) {
+    element.textContent = count;
+  }
 }
 
 function toggleCustomDiscount() {
