@@ -450,6 +450,36 @@ function renderRecord(record, combinedItems = null) {
   const f = record.fields;
   let html = '<h2>Piece Details</h2>';
   
+  // Add tabs for combined items at the top
+  if (combinedItems && combinedItems.length > 1) {
+    html += `
+      <div style="margin-bottom: 1.5em;">
+        <div style="display: flex; border-bottom: 2px solid #ddd; gap: 0.25em; flex-wrap: wrap;">
+    `;
+    combinedItems.forEach((item, index) => {
+      const itemJobNo = item.fields['Job No.'] || 'N/A';
+      const isSold = item.fields['Sold'] === true;
+      const isActive = item.id === record.id;
+      const activeStyle = isActive ? 'border-bottom: 3px solid #007bff; font-weight: bold; background: #f8f9fa;' : 'border-bottom: 3px solid transparent;';
+      const soldBadge = isSold ? '<span style="color: #dc3545; font-size: 0.8em; margin-left: 0.25em;">●</span>' : '';
+      html += `
+        <button 
+          class="item-tab" 
+          data-item-id="${item.id}"
+          style="padding: 0.75em 1.25em; cursor: pointer; border: none; background: none; font-size: 0.95em; ${activeStyle} transition: all 0.2s;"
+          onmouseover="if(!this.style.fontWeight) this.style.background='#f8f9fa'"
+          onmouseout="if(!this.style.fontWeight) this.style.background='none'"
+        >
+          ${itemJobNo}${soldBadge}
+        </button>
+      `;
+    });
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
   // Display image if available (HD first, then regular)
   const hdImage = f['HD Image'];
   const regularImage = f['Image'];
@@ -470,13 +500,8 @@ function renderRecord(record, combinedItems = null) {
   // Display key details in a table
   html += '<table style="border-collapse: collapse; margin-bottom: 1em;">';
   
-  // Show combined job numbers if available
-  if (combinedItems) {
-    const jobNumbers = combinedItems.map(item => item.fields['Job No.']).join(', ');
-    html += '<tr><td><b>Job No.</b></td><td>' + jobNumbers + '</td></tr>';
-  } else {
-    html += '<tr><td><b>Job No.</b></td><td>' + (f['Job No.'] || '') + '</td></tr>';
-  }
+  // Show single job number (current item's)
+  html += '<tr><td><b>Job No.</b></td><td>' + (f['Job No.'] || '') + '</td></tr>';
   
   html += '<tr><td><b>Design</b></td><td>' + (f['Design'] || '') + '</td></tr>';
   html += '<tr><td><b>Purity</b></td><td>' + (f['Purity'] || '') + '</td></tr>';
@@ -504,22 +529,8 @@ function renderRecord(record, combinedItems = null) {
   
   // Only show edit form in staff mode
   if (!customerMode) {
-    // Build dropdown for combined items
-    let jobDropdown = '';
-    if (combinedItems && combinedItems.length > 1) {
-      jobDropdown = `
-        <label style="display: block; margin-top: 0.5em;" for="jobSelect"><strong>Select Job to Update:</strong></label>
-        <select id="jobSelect" style="margin-left: 0.5em; padding: 0.5em;">
-      `;
-      combinedItems.forEach(item => {
-        jobDropdown += `<option value="${item.id}">${item.fields['Job No.']}</option>`;
-      });
-      jobDropdown += '</select>';
-    }
-    
     html += `
       <h3>Update Sale Information</h3>
-      ${jobDropdown}
       <form id="editForm" style="margin-top: 1em;">
         <label style="display: block; margin-top: 0.5em;"><input type="checkbox" name="Sold" ${f['Sold'] ? 'checked' : ''}> Sold</label>
         <label style="display: block; margin-top: 0.5em;">Buyer Name: <input type="text" name="Buyer Name" value="${f['Buyer Name'] || ''}" style="margin-left: 0.5em;"></label>
@@ -534,6 +545,30 @@ function renderRecord(record, combinedItems = null) {
   if (!customerMode) {
     setTimeout(() => attachEditHandler(record.id, combinedItems), 0);
   }
+  
+  // Attach handler for the item tabs if they exist
+  if (combinedItems && combinedItems.length > 1) {
+    setTimeout(() => {
+      const itemTabs = document.querySelectorAll('.item-tab');
+      itemTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          const selectedId = this.getAttribute('data-item-id');
+          const selectedItem = combinedItems.find(item => item.id === selectedId);
+          if (selectedItem) {
+            const resultDiv = document.getElementById('browseResult');
+            resultDiv.innerHTML = `
+              <button onclick="loadAllItems()" style="margin-bottom: 1em;">← Back to Browse</button>
+              <div class="detail-view">
+                ${renderRecord(selectedItem, combinedItems)}
+              </div>
+            `;
+            window.scrollTo(0, 0);
+          }
+        });
+      });
+    }, 0);
+  }
+  
   return html;
 }
 
@@ -543,12 +578,8 @@ function attachEditHandler(recordId, combinedItems) {
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    // If there's a job selector dropdown, use the selected value
-    const jobSelect = document.getElementById('jobSelect');
-    let selectedRecordId = recordId;
-    if (jobSelect) {
-      selectedRecordId = jobSelect.value;
-    }
+    // Always use the current record ID (the one being displayed)
+    const selectedRecordId = recordId;
     
     const formData = new FormData(form);
     const payload = {
