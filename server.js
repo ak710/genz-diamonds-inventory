@@ -239,26 +239,15 @@ Formula:`;
       .select({ filterByFormula: formula })
       .all();
     
-    // Transform records to match expected format
-    const results = records.map(rec => ({
-      id: rec.id,
-      jobNo: rec.get('Job No.'),
-      design: rec.get('Design'),
-      purity: rec.get('Purity'),
-      setCts: rec.get('Set Cts.'),
-      image: rec.get('HD Image') || rec.get('Image'),
-      aiDescription: rec.get('AI Description'),
-      tagPrice: rec.get('Tag Price (CAD)'),
-      inInventory: rec.get('In Inventory')
-    }));
+    console.log(`✅ Found ${records.length} results`);
     
-    console.log(`✅ Found ${results.length} results`);
-    
+    // Return records in the same format as getAllRecords (with fields property)
+    // Airtable records have an id and fields property which serialize properly
     res.json({ 
       query,
       formula,
-      results,
-      count: results.length
+      results: records,
+      count: records.length
     });
     
   } catch (err) {
