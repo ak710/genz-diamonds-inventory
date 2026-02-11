@@ -481,6 +481,15 @@ function toggleLineSheetItem(itemId, event) {
     event.stopPropagation();
   }
 }
+
+// Show item detail when clicked
+function showItemDetail(recordId) {
+  // If combine mode is enabled, search filteredItems first to find combined items
+  let item = null;
+  if (combineMode) {
+    item = filteredItems.find(i => i.id === recordId);
+  }
+  if (!item) {
     item = allItems.find(i => i.id === recordId);
   }
   if (!item) return;
