@@ -322,12 +322,13 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       }
       
       // Fetch all images with progress logging
-      console.log(`📥 Skipping image fetching for faster generation (${sanitizedItems.length} items)...`);
-      const itemsWithImages = sanitizedItems.map(item => ({
-        ...item,
-        imageBuffer: null // Skip fetching to speed up generation
-      }));
-      console.log(`✓ Ready to generate document`);
+      console.log(`📥 Fetching images for ${sanitizedItems.length} items...`);
+      const imagePromises = sanitizedItems.map(async (item) => {
+        const imageBuffer = await fetchImage(item.image);
+        return { ...item, imageBuffer };
+      });
+      const itemsWithImages = await Promise.all(imagePromises);
+      console.log(`✓ Images fetched, ready to generate document`);
       
       console.log('📋 Building document structure...');
       
@@ -527,12 +528,13 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.moveDown(2);
       
       // Fetch all images with progress logging
-      console.log(`📥 Skipping image fetching for faster PDF generation (${sanitizedItems.length} items)...`);
-      const itemsWithImages = sanitizedItems.map(item => ({
-        ...item,
-        imageBuffer: null // Skip fetching to speed up generation
-      }));
-      console.log(`✓ Ready to generate PDF`);
+      console.log(`📥 Fetching images for ${sanitizedItems.length} items...`);
+      const imagePromises = sanitizedItems.map(async (item) => {
+        const imageBuffer = await fetchImage(item.image);
+        return { ...item, imageBuffer };
+      });
+      const itemsWithImages = await Promise.all(imagePromises);
+      console.log(`✓ Images fetched, ready to generate PDF`);
       
       console.log('📋 Building PDF layout...');
       
