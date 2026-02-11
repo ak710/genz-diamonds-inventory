@@ -546,20 +546,24 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       let currentX = leftMargin;
       let currentY = doc.y;
       let itemsInCurrentRow = 0;
+      const boxHeight = 320;
+      const rowSpacing = 15;
       
       for (let i = 0; i < itemsWithImages.length; i++) {
         const item = itemsWithImages[i];
         
-        // Check if we need a new page
-        if (currentY > 650) {
+        // Check if we need a new page - ensure entire box fits on current page
+        if (currentY + boxHeight > doc.page.height - 100) {
           doc.addPage();
           currentY = 50;
           currentX = leftMargin;
           itemsInCurrentRow = 0;
         }
         
+        // Prevent PDFKit auto-pagination by setting y position
+        doc.y = currentY;
+        
         // Draw border box
-        const boxHeight = 320;
         doc.rect(currentX, currentY, boxWidth, boxHeight).stroke('#000000');
         
         // Draw image or placeholder
@@ -626,7 +630,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         if (itemsInCurrentRow >= 3) {
           // Move to next row
           currentX = leftMargin;
-          currentY += boxHeight + 15;
+          currentY += boxHeight + rowSpacing;
           itemsInCurrentRow = 0;
         } else {
           // Move to next column
@@ -635,7 +639,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       }
       
       // Set doc.y for footer
-      doc.y = currentY + (itemsInCurrentRow > 0 ? 340 : 20);
+      doc.y = currentY + (itemsInCurrentRow > 0 ? boxHeight + 20 : 20);
       
       // Footer
       doc.fontSize(9).font('Helvetica-Oblique');
