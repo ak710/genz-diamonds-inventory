@@ -280,17 +280,21 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
     
     // Helper function to fetch image as buffer
     async function fetchImage(url) {
-      if (!url) return null;
+      if (!url) {
+        console.log('⊘ No image URL provided');
+        return null;
+      }
       try {
-        console.log(`Fetching image: ${url}`);
+        console.log(`📥 Fetching image: ${url.substring(0, 80)}...`);
         const response = await axios.get(url, { 
           responseType: 'arraybuffer',
-          timeout: 10000 // 10 second timeout
+          timeout: 15000, // 15 second timeout
+          maxRedirects: 5
         });
-        console.log(`✓ Image fetched successfully`);
+        console.log(`✓ Image fetched successfully (${response.data.length} bytes)`);
         return Buffer.from(response.data);
       } catch (error) {
-        console.error(`✗ Failed to fetch image ${url}:`, error.message);
+        console.error(`✗ Failed to fetch image:`, error.message);
         return null;
       }
     }

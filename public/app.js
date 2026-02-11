@@ -983,8 +983,31 @@ async function generateLineSheet() {
       const discountedPrice = roundToNearest5(tagPrice * (1 - discountPercent / 100));
       const retailPrice = roundToNearest5(discountedPrice * 2.5);
       
+      // Try multiple ways to get image URL
+      let imageUrl = null;
+      
+      // Try HD Image first
+      if (f['HD Image']) {
+        if (Array.isArray(f['HD Image']) && f['HD Image'].length > 0) {
+          imageUrl = f['HD Image'][0].url;
+        } else if (typeof f['HD Image'] === 'string') {
+          imageUrl = f['HD Image'];
+        }
+      }
+      
+      // Fallback to regular Image
+      if (!imageUrl && f['Image']) {
+        if (Array.isArray(f['Image']) && f['Image'].length > 0) {
+          imageUrl = f['Image'][0].url;
+        } else if (typeof f['Image'] === 'string') {
+          imageUrl = f['Image'];
+        }
+      }
+      
+      console.log(`Item ${f['Design']}: image URL = ${imageUrl ? imageUrl.substring(0, 50) + '...' : 'null'}`);
+      
       return {
-        image: f['HD Image']?.[0]?.url || f['Image']?.[0]?.url || null,
+        image: imageUrl,
         design: f['Design'] || 'N/A',
         purity: f['Purity'] || '',
         setCts: f['Set Cts.'] || '',
