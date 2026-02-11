@@ -198,11 +198,6 @@ function switchTab(tab) {
     document.getElementById('inventoryScan').focus();
   }
 }
-    document.querySelector('.tab:nth-child(1)').classList.add('active');
-    document.getElementById('browseTab').classList.add('active');
-    if (allItems.length === 0) loadAllItems();
-  } else if (tab === 'search') {
-    document.querySelector('.tab:nth-child(2)').classList.add('active');
     document.getElementById('searchTab').classList.add('active');
     document.getElementById('barcode').focus();
   } else if (tab === 'inventory') {
@@ -826,23 +821,58 @@ let lineSheetItems = [];
 let selectedLineSheetItems = new Set();
 
 async function loadLineSheetItems() {
+  const container = document.getElementById('linesheetItemsList');
+  
   try {
-    const response = await fetch('/api/items');
-    const records = await response.json();
-    
-    lineSheetItems = records.map(record => ({
-      id: record.id,
-      fields: record.fields
-    }));
-    
-    renderLineSheetItems();
+    // Use allItems if already loaded, otherwise fetch
+    if (allItems.length > 0) {
+      lineSheetItems = allItems.map(record => ({
+        id: record.id,
+        fields: record.fields
+      }));
+      renderLineSheetItems();
+    } else {
+      container.innerHTML = '<p style="color: #666; text-align: center;">Loading items...</p>';
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/items', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load items: ${response.status}`);
+      }
+      
+      const records = await response.json();
+      allItems = records;
+      lineSheetItems = records.map(record => ({
+        id: record.id,
+        fields: record.fields
+      }));
+      
+      renderLineSheetItems();
+    }
   } catch (error) {
     console.error('Error loading items for line sheet:', error);
+    container.innerHTML = `
+      <div style="color: #dc3545; text-align: center; padding: 2em;">
+        <p><strong>⚠️ Error loading items</strong></p>
+        <p style="font-size: 0.9em;">${error.message}</p>
+        <button onclick="loadLineSheetItems()" class="btn-secondary" style="margin-top: 1em;">Try Again</button>
+      </div>
+    `;
   }
 }
 
 function renderLineSheetItems() {
-  const container = document.getElementById('linesheet-items');
+  const container = document.getElementById('linesheetItemsList');
+  
+  if (lineSheetItems.length === 0) {
+    container.innerHTML = '<p style="color: #666; text-align: center;">No items available</p>';
+    return;
+  }
+  
   container.innerHTML = '';
   
   lineSheetItems.forEach(item => {
@@ -911,10 +941,15 @@ function updateSelectedCount() {
 
 function toggleCustomDiscount() {
   const discountType = document.querySelector('input[name="discount-type"]:checked').value;
-  const customDiscountInput = document.getElementById('custom-discount');
-  customDiscountInput.disabled = discountType !== 'custom';
-  if (discountType !== 'custom') {
-    customDiscountInput.value = '';
+  const presetDiscounts = document.getElementById('presetDiscounts');
+  const customDiscount = document.getElementById('customDiscount');
+  
+  if (discountType === 'custom') {
+    presetDiscounts.style.display = 'none';
+    customDiscount.style.display = 'block';
+  } else {
+    presetDiscounts.style.display = 'flex';
+    customDiscount.style.display = 'none';
   }
 }
 
@@ -932,7 +967,7 @@ async function generateLineSheet() {
   let discountPercent = 0;
   
   if (discountType === 'custom') {
-    discountPercent = parseFloat(document.getElementById('custom-discount').value) || 0;
+    discountPercent = parseFloat(document.getElementById('customDiscountValue').value) || 0;
     if (discountPercent <= 0 || discountPercent >= 100) {
       alert('Please enter a valid discount percentage between 0 and 100.');
       return;
@@ -941,7 +976,7 @@ async function generateLineSheet() {
     discountPercent = parseInt(discountType);
   }
   
-  const exportFormat = document.getElementById('export-format').value;
+  const exportFormat = document.getElementById('exportFormat').value;
   
   // Prepare selected items data
   const selectedItems = lineSheetItems
@@ -965,16 +1000,18 @@ async function generateLineSheet() {
     });
   
   try {
-    const button = document.querySelector('#linesheet button');
+    const button = document.querySelector('#linesheetTab button.btn-primary');
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Generating...';
     
+    const token = localStorage.getItem('authToken');
     const response = await fetch('/api/generate-linesheet', {
-      method: 'POST',
       headers: {
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      method: 'POST',
       body: JSON.stringify({
         items: selectedItems,
         format: exportFormat,
