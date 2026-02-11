@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const OpenAI = require('openai');
-const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, VerticalAlign, WidthType, AlignmentType, HeadingLevel, ImageRun } = require('docx');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, VerticalAlign, WidthType, AlignmentType, HeadingLevel, ImageRun, BorderStyle } = require('docx');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const app = express();
@@ -271,6 +271,13 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No items provided' });
     }
     
+    // Sanitize items to ensure prices are valid numbers
+    const sanitizedItems = items.map(item => ({
+      ...item,
+      wholesalePrice: parseFloat(item.wholesalePrice) || 0,
+      retailPrice: parseFloat(item.retailPrice) || 0
+    }));
+    
     // Helper function to fetch image as buffer
     async function fetchImage(url) {
       if (!url) return null;
@@ -315,8 +322,8 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       }
       
       // Fetch all images with progress logging
-      console.log(`📥 Skipping image fetching for faster generation (${items.length} items)...`);
-      const itemsWithImages = items.map(item => ({
+      console.log(`📥 Skipping image fetching for faster generation (${sanitizedItems.length} items)...`);
+      const itemsWithImages = sanitizedItems.map(item => ({
         ...item,
         imageBuffer: null // Skip fetching to speed up generation
       }));
@@ -430,10 +437,10 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               right: 100
             },
             borders: {
-              top: { style: 'single', size: 1, color: '000000' },
-              bottom: { style: 'single', size: 1, color: '000000' },
-              left: { style: 'single', size: 1, color: '000000' },
-              right: { style: 'single', size: 1, color: '000000' }
+              top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: '000000' }
             }
           });
         });
@@ -445,10 +452,10 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               children: [new Paragraph('')],
               width: { size: 33, type: WidthType.PERCENTAGE },
               borders: {
-                top: { style: 'single', size: 1, color: '000000' },
-                bottom: { style: 'single', size: 1, color: '000000' },
-                left: { style: 'single', size: 1, color: '000000' },
-                right: { style: 'single', size: 1, color: '000000' }
+                top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                right: { style: BorderStyle.SINGLE, size: 1, color: '000000' }
               }
             })
           );
@@ -534,8 +541,8 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.moveDown(2);
       
       // Fetch all images with progress logging
-      console.log(`📥 Skipping image fetching for faster PDF generation (${items.length} items)...`);
-      const itemsWithImages = items.map(item => ({
+      console.log(`📥 Skipping image fetching for faster PDF generation (${sanitizedItems.length} items)...`);
+      const itemsWithImages = sanitizedItems.map(item => ({
         ...item,
         imageBuffer: null // Skip fetching to speed up generation
       }));

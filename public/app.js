@@ -949,6 +949,7 @@ function toggleCustomDiscount() {
 }
 
 function roundToNearest5(price) {
+  if (!price || isNaN(price)) return 0;
   return Math.round(price / 5) * 5;
 }
 
@@ -978,7 +979,7 @@ async function generateLineSheet() {
     .filter(item => selectedLineSheetItems.has(item.id))
     .map(item => {
       const f = item.fields;
-      const tagPrice = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+      const tagPrice = parseFloat(f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0);
       const discountedPrice = roundToNearest5(tagPrice * (1 - discountPercent / 100));
       const retailPrice = roundToNearest5(discountedPrice * 2.5);
       
