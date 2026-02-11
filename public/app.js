@@ -113,6 +113,11 @@ function applyFilters() {
   displayItems(filteredItems);
 }
 
+// Helper function to get placeholder image
+function getPlaceholder() {
+  return 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2214%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E';
+}
+
 // Display items in grid
 function displayItems(items) {
   const resultDiv = document.getElementById('browseResult');
@@ -126,6 +131,7 @@ function displayItems(items) {
   
   items.forEach(item => {
     const f = item.fields;
+    const hdImage = f['HD Image'] || '';
     const image = f['Image'] || '';
     const jobNo = f['Job No.'] || 'N/A';
     const design = f['Design'] || 'N/A';
@@ -134,9 +140,13 @@ function displayItems(items) {
     const weight = f['Gross Weight (Gr. Wt.)'] || '';
     const isSold = f['Sold'] === true;
     
+    // Use HD image first, fallback to regular image, then placeholder
+    const imageUrl = hdImage || image || getPlaceholder();
+    const fallbackUrl = image || getPlaceholder();
+    
     html += `
       <div class="item-card" onclick="showItemDetail('${item.id}')">
-        <img src="${image}" alt="${design}" class="item-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22200%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22280%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2214%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'">
+        <img src="${imageUrl}" alt="${design}" class="item-image" onerror="if(this.src !== '${fallbackUrl}') { this.src = '${fallbackUrl}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }">
         <div class="item-details">
           <h3>${design}</h3>
           <p><strong>Job No:</strong> ${jobNo}</p>
@@ -192,9 +202,12 @@ function renderRecord(record) {
   const f = record.fields;
   let html = '<h2>Piece Details</h2>';
   
-  // Display image if available
-  if (f['Image']) {
-    html += `<div><img src="${f['Image']}" alt="Jewellery Image" class="detail-image" /></div>`;
+  // Display image if available (HD first, then regular)
+  const hdImage = f['HD Image'];
+  const regularImage = f['Image'];
+  if (hdImage || regularImage) {
+    const imageUrl = hdImage || regularImage;
+    html += `<div><img src="${imageUrl}" alt="Jewellery Image" class="detail-image" onerror="if(this.src !== '${regularImage || ''}') { this.src = '${regularImage || getPlaceholder()}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }" /></div>`;
   }
   
   // Display key details in a table

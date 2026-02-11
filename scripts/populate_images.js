@@ -5,6 +5,7 @@ const API_KEY = process.env.AIRTABLE_API_KEY;
 const BASE_ID = process.env.AIRTABLE_BASE_ID;
 const TABLE_NAME = process.env.AIRTABLE_TABLE_NAME;
 const CDN_BASE = 'https://res.cloudinary.com/dg6sicjri/image/upload/v1770609947/';
+const HD_CDN_BASE = 'https://res.cloudinary.com/dg6sicjri/image/upload/v1770790437/';
 
 if (!API_KEY || !BASE_ID || !TABLE_NAME) {
   console.error('Missing AIRTABLE_API_KEY, AIRTABLE_BASE_ID or AIRTABLE_TABLE_NAME in .env');
@@ -30,13 +31,17 @@ function chunkArray(arr, size) {
 
     for (const rec of records) {
       const jobNo = (rec.get('Job No.') || '').toString().trim();
+      const design = (rec.get('Design') || '').toString().trim();
       if (!jobNo) {
         skipped.push({ id: rec.id, reason: 'No Job No.' });
         continue;
       }
       const url = `${CDN_BASE}${encodeURIComponent(jobNo)}.jpg`;
-      // Store the CDN link in the text field "Image"
-      updates.push({ id: rec.id, fields: { 'Image': url } });
+      // Extract first 9 characters of Design field for HD image
+      const designPrefix = design.substring(0, 9);
+      const hdUrl = designPrefix ? `${HD_CDN_BASE}${encodeURIComponent(designPrefix)}.jpg` : '';
+      // Store both CDN links
+      updates.push({ id: rec.id, fields: { 'Image': url, 'HD Image': hdUrl } });
     }
 
     console.log(`Prepared ${updates.length} updates, ${skipped.length} skipped`);
