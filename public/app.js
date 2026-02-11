@@ -360,14 +360,20 @@ function displayItems(items) {
     });
     
     statsHtml = `
-      <div style="background: #f0f8ff; padding: 1.5em; border-radius: 5px; margin-bottom: 2em; display: flex; gap: 3em;">
-        <div style="flex: 1; text-align: center;">
-          <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${piecesInStock}/${totalPieces}</div>
-          <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Pieces in Stock / Total</div>
+      <div style="background: #f0f8ff; padding: 1.5em; border-radius: 5px; margin-bottom: 2em; display: flex; gap: 3em; align-items: center; justify-content: space-between;">
+        <div style="display: flex; gap: 3em; flex: 1;">
+          <div style="flex: 1; text-align: center;">
+            <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${piecesInStock}/${totalPieces}</div>
+            <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Pieces in Stock / Total</div>
+          </div>
+          <div style="flex: 1; text-align: center; border-left: 1px solid #ddd; padding-left: 3em;">
+            <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${uniqueDesigns.size}</div>
+            <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Unique Designs</div>
+          </div>
         </div>
-        <div style="flex: 1; text-align: center; border-left: 1px solid #ddd; padding-left: 3em;">
-          <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${uniqueDesigns.size}</div>
-          <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Unique Designs</div>
+        <div style="padding-left: 2em; border-left: 1px solid #ddd; text-align: center;">
+          <div style="font-size: 1.8em; font-weight: bold; color: #28a745;">${selectedLineSheetItems.size}</div>
+          <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Selected for Line Sheet</div>
         </div>
       </div>
     `;
@@ -399,8 +405,22 @@ function displayItems(items) {
     const stock = item._combinedItems ? item._combinedItems.length : 1;
     const stockDisplay = combineMode ? `<p><strong>Stock:</strong> ${stock}</p>` : '';
     
+    // Check if item is selected for line sheet
+    const isSelectedForLineSheet = selectedLineSheetItems.has(item.id);
+    const selectionCheckbox = !customerMode ? `
+      <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+        <input type="checkbox" id="linesheet-check-${item.id}" 
+               onchange="toggleLineSheetItem('${item.id}')" 
+               ${isSelectedForLineSheet ? 'checked' : ''}
+               style="width: 20px; height: 20px; cursor: pointer;">
+      </div>
+    ` : '';
+    
+    const cardStyle = isSelectedForLineSheet ? 'background: #e8f5e9; border: 2px solid #4caf50;' : '';
+    
     html += `
-      <div class="item-card" onclick="showItemDetail('${item.id}')">
+      <div class="item-card" style="${cardStyle} position: relative;" onclick="showItemDetail('${item.id}')">
+        ${selectionCheckbox}
         <img src="${imageUrl}" alt="${design}" class="item-image" onerror="if(this.src !== '${fallbackUrl}') { this.src = '${fallbackUrl}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }">
         <div class="item-details">
           <h3>${design}</h3>
@@ -420,14 +440,45 @@ function displayItems(items) {
   resultDiv.innerHTML = html;
 }
 
-// Show item detail when clicked
-function showItemDetail(recordId) {
-  // If combine mode is enabled, search filteredItems first to find combined items
-  let item = null;
-  if (combineMode) {
-    item = filteredItems.find(i => i.id === recordId);
+function toggleLineSheetItem(itemId) {
+  const checkbox = document.getElementById(`linesheet-check-${itemId}`);
+  const isChecked = checkbox.checked;
+  const item = filteredItems.find(i => i.id === itemId);
+  
+  if (isChecked) {
+    selectedLineSheetItems.add(itemId);
+    // Add the item data to lineSheetItems if not already there
+    if (!lineSheetItems.find(i => i.id === itemId)) {
+      lineSheetItems.push(item);
+    }
+  } else {
+    selectedLineSheetItems.delete(itemId);
+    // Remove from lineSheetItems
+    lineSheetItems = lineSheetItems.filter(i => i.id !== itemId);
   }
-  if (!item) {
+  
+  // Update visual feedback
+  const itemCard = checkbox.closest('.item-card');
+  if (isChecked) {
+    itemCard.style.background = '#e8f5e9';
+    itemCard.style.border = '2px solid #4caf50';
+  } else {
+    itemCard.style.background = '';
+    itemCard.style.border = '';
+  }
+  
+  // Update the stats counter
+  const statCounter = document.querySelector('[style*="Selected for Line Sheet"]');
+  if (statCounter) {
+    statCounter.innerHTML = `
+      <div style="font-size: 1.8em; font-weight: bold; color: #28a745;">${selectedLineSheetItems.size}</div>
+      <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Selected for Line Sheet</div>
+    `;
+  }
+  
+  // Prevent event from bubbling to showItemDetail
+  event.stopPropagation();
+}
     item = allItems.find(i => i.id === recordId);
   }
   if (!item) return;
