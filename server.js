@@ -548,14 +548,14 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       let currentX = leftMargin;
       let currentY = doc.y;
       let itemsInCurrentRow = 0;
-      const boxHeight = 320;
+      const boxHeight = 260;
       const rowSpacing = 15;
       
       for (let i = 0; i < itemsWithImages.length; i++) {
         const item = itemsWithImages[i];
         
         // Check if we need a new page - ensure entire box fits on current page
-        if (currentY + boxHeight > doc.page.height - 100) {
+        if (currentY + boxHeight > doc.page.height - 80) {
           doc.addPage();
           currentY = 50;
           currentX = leftMargin;
@@ -603,7 +603,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         
         // Add item details below image - left aligned
         const detailsX = currentX + 10;
-        const detailsY = imageY + imageHeight + 15;
+        const detailsY = imageY + imageHeight + 10;
         const textWidth = boxWidth - 20;
         
         doc.fontSize(10).font('Helvetica-Bold').text(`SKU: ${item.design}`, detailsX, detailsY, {
