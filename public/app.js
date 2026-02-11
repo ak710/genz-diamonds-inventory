@@ -32,15 +32,23 @@ function toggleCustomerMode() {
   customerMode = !customerMode;
   localStorage.setItem('customerMode', customerMode);
   
-  // Hide/show inventory tab
-  const inventoryTab = document.querySelector('.tab:nth-child(3)');
-  if (inventoryTab) {
-    inventoryTab.style.display = customerMode ? 'none' : 'block';
+  // Hide/show Line Sheet tab (3rd tab) and Take Inventory tab (4th tab)
+  const linesheetTabButton = document.querySelector('.tab:nth-child(3)');
+  const inventoryTabButton = document.querySelector('.tab:nth-child(4)');
+  
+  if (linesheetTabButton) {
+    linesheetTabButton.style.display = customerMode ? 'none' : 'block';
+  }
+  if (inventoryTabButton) {
+    inventoryTabButton.style.display = customerMode ? 'none' : 'block';
   }
   
-  // If currently on inventory tab and switching to customer mode, switch to browse
-  if (customerMode && document.getElementById('inventoryTab').classList.contains('active')) {
-    switchTab('browse');
+  // If currently on line sheet or inventory tab and switching to customer mode, switch to browse
+  if (customerMode) {
+    if (document.getElementById('linesheetTab').classList.contains('active') || 
+        document.getElementById('inventoryTab').classList.contains('active')) {
+      switchTab('browse');
+    }
   }
   
   // Refresh current view based on active tab
@@ -62,11 +70,15 @@ document.addEventListener('DOMContentLoaded', function() {
     toggle.checked = customerMode;
   }
   
-  // Hide inventory tab on initial load if in customer mode
+  // Hide Line Sheet and Take Inventory tabs on initial load if in customer mode
   if (customerMode) {
-    const inventoryTab = document.querySelector('.tab:nth-child(3)');
-    if (inventoryTab) {
-      inventoryTab.style.display = 'none';
+    const linesheetTabButton = document.querySelector('.tab:nth-child(3)');
+    const inventoryTabButton = document.querySelector('.tab:nth-child(4)');
+    if (linesheetTabButton) {
+      linesheetTabButton.style.display = 'none';
+    }
+    if (inventoryTabButton) {
+      inventoryTabButton.style.display = 'none';
     }
   }
 });
