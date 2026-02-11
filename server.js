@@ -473,11 +473,15 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         sections: [{
           properties: {},
           children: [
-            ...logoChildren,
             new Paragraph({
               text: `Date: ${new Date().toLocaleDateString()}`,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 400 }
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 200 }
+            }),
+            ...logoChildren,
+            new Paragraph({
+              text: "",
+              spacing: { after: 200 }
             }),
             new Table({
               width: { size: 100, type: WidthType.PERCENTAGE },
@@ -518,7 +522,10 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       
       doc.pipe(res);
       
-      // Add logo if it exists
+      // Add date in top left
+      doc.fontSize(10).text(`Date: ${new Date().toLocaleDateString()}`, 40, 40, { align: 'left' });
+      
+      // Add logo if it exists (centered)
       if (fs.existsSync(logoPath)) {
         const logoWidth = 150;
         const logoHeight = 75;
@@ -527,8 +534,6 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         doc.moveDown(4);
       }
       
-      // Title
-      doc.fontSize(12).text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.moveDown(2);
       
       // Fetch all images with progress logging
