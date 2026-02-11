@@ -894,7 +894,7 @@ function renderLineSheetItems() {
         <div>
           <strong>${f['Design'] || 'N/A'}</strong> - ${f['Purity'] || ''} 
           <br>
-          <small>Tag Price: $${f['Tag Price (CAD)'] || 'N/A'}</small>
+          <small>Tag Price: $${f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 'N/A'}</small>
         </div>
       </div>
     `;
@@ -978,7 +978,7 @@ async function generateLineSheet() {
     .filter(item => selectedLineSheetItems.has(item.id))
     .map(item => {
       const f = item.fields;
-      const tagPrice = f['Tag Price (CAD)'] || 0;
+      const tagPrice = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
       const discountedPrice = roundToNearest5(tagPrice * (1 - discountPercent / 100));
       const retailPrice = roundToNearest5(discountedPrice * 2.5);
       
