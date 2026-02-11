@@ -240,7 +240,49 @@ function displayItems(items) {
     return;
   }
   
-  let html = `<div class="items-grid">`;
+  // Calculate stats (only for staff mode)
+  let statsHtml = '';
+  if (!customerMode) {
+    let totalPieces = 0;
+    let piecesInStock = 0;
+    const uniqueDesigns = new Set();
+    
+    items.forEach(item => {
+      const f = item.fields;
+      const isSold = f['Sold'] === true;
+      
+      if (combineMode && item._combinedItems) {
+        // For combined items, count stock
+        totalPieces += item._combinedItems.length;
+        if (!isSold) {
+          piecesInStock += item._combinedItems.length;
+        }
+        uniqueDesigns.add(f['Design']);
+      } else {
+        // For regular items, count 1 per item
+        totalPieces += 1;
+        if (!isSold) {
+          piecesInStock += 1;
+        }
+        uniqueDesigns.add(f['Design']);
+      }
+    });
+    
+    statsHtml = `
+      <div style="background: #f0f8ff; padding: 1.5em; border-radius: 5px; margin-bottom: 2em; display: flex; gap: 3em;">
+        <div style="flex: 1; text-align: center;">
+          <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${piecesInStock}/${totalPieces}</div>
+          <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Pieces in Stock / Total</div>
+        </div>
+        <div style="flex: 1; text-align: center; border-left: 1px solid #ddd; padding-left: 3em;">
+          <div style="font-size: 1.8em; font-weight: bold; color: #007bff;">${uniqueDesigns.size}</div>
+          <div style="color: #666; font-size: 0.9em; margin-top: 0.5em;">Unique Designs</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  let html = statsHtml + `<div class="items-grid">`;
   
   items.forEach(item => {
     const f = item.fields;
