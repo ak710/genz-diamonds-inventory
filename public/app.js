@@ -284,10 +284,13 @@ function displayItems(items) {
 
 // Show item detail when clicked
 function showItemDetail(recordId) {
-  let item = allItems.find(i => i.id === recordId);
-  if (!item) {
-    // If not found in allItems, check if it's in filteredItems (for combined mode)
+  // If combine mode is enabled, search filteredItems first to find combined items
+  let item = null;
+  if (combineMode) {
     item = filteredItems.find(i => i.id === recordId);
+  }
+  if (!item) {
+    item = allItems.find(i => i.id === recordId);
   }
   if (!item) return;
   
