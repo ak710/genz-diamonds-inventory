@@ -1,24 +1,20 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const path = require('path');
 const app = express();
 
 app.use(express.json());
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'genz-diamonds-secret-key-change-this',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
-}));
 
 const airtable = require('./lib/airtableClient');
 
 const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || 'genz2026';
 
-// Auth middleware
+// Auth middleware - checks for token in Authorization header
 function requireAuth(req, res, next) {
-  if (req.session.authenticated) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  
+  if (token === ACCESS_PASSWORD) {
     return next();
   }
   res.status(401).json({ error: 'Unauthorized' });
@@ -28,8 +24,7 @@ function requireAuth(req, res, next) {
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
   if (password === ACCESS_PASSWORD) {
-    req.session.authenticated = true;
-    res.json({ success: true });
+    res.json({ success: true, token: ACCESS_PASSWORD });
   } else {
     res.status(401).json({ error: 'Invalid password' });
   }
@@ -37,22 +32,21 @@ app.post('/api/login', (req, res) => {
 
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
-  req.session.destroy();
   res.json({ success: true });
 });
 
-// Serve login page for unauthenticated users
-app.get('/', (req, res) => {
-  if (!req.session.authenticated) {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-  } else {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  }
+// Serve static files (no auth needed for HTML/CSS/JS files)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve login page
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Protect static files
-app.use('/app.js', requireAuth, express.static(path.join(__dirname, 'public/app.js')));
-app.use(express.static(path.join(__dirname, 'public')));
+// Default route - serve index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Search by Job No. (barcode)
 app.get('/api/search/:jobNo', requireAuth, async (req, res) => {

@@ -2,6 +2,28 @@ let allItems = [];
 let filteredItems = [];
 let scannedItems = [];
 let scanAudio = null;
+let authToken = localStorage.getItem('authToken') || null;
+
+// Check if user is authenticated
+if (!authToken && window.location.pathname !== '/login.html' && !window.location.pathname.endsWith('login.html')) {
+  // Redirect to login if no token and not already on login page
+  window.location.href = '/login.html';
+}
+
+// Helper function to get auth headers
+function getAuthHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${authToken}`
+  };
+}
+
+// Logout function
+function logout() {
+  localStorage.removeItem('authToken');
+  authToken = null;
+  window.location.href = '/login.html';
+}
 
 // Initialize audio
 function initAudio() {
@@ -37,7 +59,10 @@ async function loadAllItems() {
   resultDiv.innerHTML = '<div class="loading">Loading inventory...</div>';
   
   try {
-    const res = await fetch('/api/items');
+    const res = await fetch('/api/items', {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     allItems = data.records || [];
     filteredItems = [...allItems];
@@ -49,6 +74,7 @@ async function loadAllItems() {
     displayItems(filteredItems);
   } catch (err) {
     resultDiv.innerHTML = '<p style="color: red;">Error loading items.</p>';
+    console.error('Error:', err);
   }
 }
 
@@ -266,7 +292,7 @@ function attachEditHandler(recordId) {
     
     const res = await fetch(`/api/update/${recordId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
     const msgDiv = document.getElementById('updateMsg');
@@ -319,7 +345,9 @@ async function processInventoryScan(jobNo) {
     }
     
     // Fetch item
-    const res = await fetch(`/api/search/${encodeURIComponent(jobNo)}`);
+    const res = await fetch(`/api/search/${encodeURIComponent(jobNo)}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Not found');
     
     const data = await res.json();
@@ -358,7 +386,7 @@ async function updateInventoryStatus(recordId, date) {
   try {
     await fetch(`/api/update/${recordId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         'In Inventory': true,
         'Last Inventory Date': date
