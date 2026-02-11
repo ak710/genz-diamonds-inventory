@@ -162,9 +162,60 @@
       margin: 0 auto;
     }
     .detail-image {
-      max-width: 100%;
+      max-width: 350px;
       border: 1px solid #ccc;
       margin-bottom: 1em;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .detail-image:hover {
+      opacity: 0.8;
+    }
+    .image-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-modal.show {
+      display: flex;
+    }
+    .image-modal-content {
+      position: relative;
+      background: white;
+      border-radius: 10px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .image-modal-content img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    .image-modal-close {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      padding: 5px 15px;
+      border-radius: 5px;
+      transition: background 0.2s;
+    }
+    .image-modal-close:hover {
+      background: rgba(0, 0, 0, 0.8);
     }
     table {
       border-collapse: collapse;
@@ -388,6 +439,14 @@
         
         <div id="scannedItems" class="scanned-items"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div id="imageModal" class="image-modal">
+    <div class="image-modal-content">
+      <button class="image-modal-close" onclick="closeImageModal()">&times;</button>
+      <img id="modalImage" src="" alt="Full Size Image">
     </div>
   </div>
   

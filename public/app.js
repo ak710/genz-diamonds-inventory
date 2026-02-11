@@ -25,6 +25,38 @@ function logout() {
   window.location.href = '/login.html';
 }
 
+// Image Modal functions
+function openImageModal(imageUrl) {
+  const modal = document.getElementById('imageModal');
+  const modalImage = document.getElementById('modalImage');
+  modalImage.src = imageUrl;
+  modal.classList.add('show');
+}
+
+function closeImageModal() {
+  const modal = document.getElementById('imageModal');
+  modal.classList.remove('show');
+}
+
+// Close modal when clicking outside the image
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('imageModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        closeImageModal();
+      }
+    });
+  }
+  
+  // Close modal with Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeImageModal();
+    }
+  });
+});
+
 // Initialize audio
 function initAudio() {
   scanAudio = {
@@ -233,7 +265,16 @@ function renderRecord(record) {
   const regularImage = f['Image'];
   if (hdImage || regularImage) {
     const imageUrl = hdImage || regularImage;
-    html += `<div><img src="${imageUrl}" alt="Jewellery Image" class="detail-image" onerror="if(this.src !== '${regularImage || ''}') { this.src = '${regularImage || getPlaceholder()}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }" /></div>`;
+    const onErrorFallback = `this.src='${regularImage || getPlaceholder()}';`;
+    html += `<div style="text-align: left; margin-bottom: 1em;">
+      <img src="${imageUrl}" 
+           alt="Jewellery Image" 
+           class="detail-image" 
+           onclick="openImageModal('${imageUrl}')"
+           onerror="if(this.src !== '${regularImage || ''}') { this.src = '${regularImage || getPlaceholder()}'; } else if(this.src !== '${getPlaceholder()}') { this.src = '${getPlaceholder()}'; }" 
+      />
+      <p style="font-size: 0.85em; color: #666; margin: 0.5em 0 0 0;">Click to enlarge</p>
+    </div>`;
   }
   
   // Display key details in a table
