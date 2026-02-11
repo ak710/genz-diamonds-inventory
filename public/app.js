@@ -972,8 +972,6 @@ async function generateLineSheet() {
     discountPercent = parseInt(document.querySelector('input[name="discount"]:checked').value);
   }
   
-  const exportFormat = document.getElementById('exportFormat').value;
-  
   // Prepare selected items data
   const selectedItems = lineSheetItems
     .filter(item => selectedLineSheetItems.has(item.id))
@@ -1031,7 +1029,7 @@ async function generateLineSheet() {
       method: 'POST',
       body: JSON.stringify({
         items: selectedItems,
-        format: exportFormat,
+        format: 'pdf',
         discountPercent: discountPercent
       })
     });
@@ -1046,7 +1044,7 @@ async function generateLineSheet() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `linesheet_${new Date().toISOString().slice(0, 10)}.${exportFormat}`;
+    a.download = `linesheet_${new Date().toISOString().slice(0, 10)}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
     
