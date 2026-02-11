@@ -411,7 +411,6 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               children: [
                 new TextRun({
                   text: `Wholesale: $${item.wholesalePrice.toFixed(2)}`,
-                  bold: true,
                   size: 20
                 })
               ]
@@ -421,6 +420,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
               children: [
                 new TextRun({
                   text: `Suggested Retail: $${item.retailPrice.toFixed(2)}`,
+                  bold: true,
                   size: 20
                 })
               ]
@@ -469,17 +469,6 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
           properties: {},
           children: [
             ...logoChildren,
-            new Paragraph({
-              text: "LINE SHEET",
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 }
-            }),
-            new Paragraph({
-              text: `Discount Applied: ${discountPercent}%`,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 100 }
-            }),
             new Paragraph({
               text: `Date: ${new Date().toLocaleDateString()}`,
               alignment: AlignmentType.CENTER,
@@ -534,10 +523,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       }
       
       // Title
-      doc.fontSize(20).text('LINE SHEET', { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(12).text(`Discount Applied: ${discountPercent}%`, { align: 'center' });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.fontSize(12).text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.moveDown(2);
       
       // Fetch all images with progress logging
@@ -626,11 +612,11 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
           width: textWidth,
           align: 'left'
         });
-        doc.font('Helvetica-Bold').text(`Wholesale: $${item.wholesalePrice.toFixed(2)}`, detailsX, detailsY + 42, {
+        doc.font('Helvetica').text(`Wholesale: $${item.wholesalePrice.toFixed(2)}`, detailsX, detailsY + 42, {
           width: textWidth,
           align: 'left'
         });
-        doc.font('Helvetica').text(`Suggested Retail: $${item.retailPrice.toFixed(2)}`, detailsX, detailsY + 56, {
+        doc.font('Helvetica-Bold').text(`Suggested Retail: $${item.retailPrice.toFixed(2)}`, detailsX, detailsY + 56, {
           width: textWidth,
           align: 'left'
         });
