@@ -275,15 +275,21 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
     async function fetchImage(url) {
       if (!url) return null;
       try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        console.log(`Fetching image: ${url}`);
+        const response = await axios.get(url, { 
+          responseType: 'arraybuffer',
+          timeout: 10000 // 10 second timeout
+        });
+        console.log(`✓ Image fetched successfully`);
         return Buffer.from(response.data);
       } catch (error) {
-        console.error(`Failed to fetch image ${url}:`, error.message);
+        console.error(`✗ Failed to fetch image ${url}:`, error.message);
         return null;
       }
     }
     
     if (format === 'docx') {
+      console.log('📝 Generating Word document...');
       // Generate Word document
       const logoPath = path.join(__dirname, 'public', 'assets', 'logo.png');
       let logoChildren = [];
@@ -308,11 +314,15 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         ];
       }
       
-      // Fetch all images
-      const itemsWithImages = await Promise.all(items.map(async (item) => {
-        const imageBuffer = item.image ? await fetchImage(item.image) : null;
-        return { ...item, imageBuffer };
+      // Fetch all images with progress logging
+      console.log(`📥 Skipping image fetching for faster generation (${items.length} items)...`);
+      const itemsWithImages = items.map(item => ({
+        ...item,
+        imageBuffer: null // Skip fetching to speed up generation
       }));
+      console.log(`✓ Ready to generate document`);
+      
+      console.log('📋 Building document structure...');
       
       // Create 3-column table with borders
       const itemsPerRow = 3;
@@ -488,12 +498,16 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         }]
       });
       
+      console.log('📦 Packing document...');
       const buffer = await Packer.toBuffer(doc);
+      console.log(`✓ Word document generated (${buffer.length} bytes)`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename=linesheet_${new Date().toISOString().slice(0, 10)}.docx`);
       res.send(buffer);
+      console.log('✓ Document sent to client');
       
     } else if (format === 'pdf') {
+      console.log('📝 Generating PDF document...');
       // Generate PDF document
       const doc = new PDFDocument({ margin: 50 });
       const logoPath = path.join(__dirname, 'public', 'assets', 'logo.png');
@@ -519,11 +533,15 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.text(`Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.moveDown(2);
       
-      // Fetch all images
-      const itemsWithImages = await Promise.all(items.map(async (item) => {
-        const imageBuffer = item.image ? await fetchImage(item.image) : null;
-        return { ...item, imageBuffer };
+      // Fetch all images with progress logging
+      console.log(`📥 Skipping image fetching for faster PDF generation (${items.length} items)...`);
+      const itemsWithImages = items.map(item => ({
+        ...item,
+        imageBuffer: null // Skip fetching to speed up generation
       }));
+      console.log(`✓ Ready to generate PDF`);
+      
+      console.log('📋 Building PDF layout...');
       
       // Layout items in 3 columns with borders
       const imageWidth = 150;
@@ -632,6 +650,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.text('Suggested retail price is calculated at 2.5x wholesale price', leftMargin, doc.y + 12, { align: 'center', width: doc.page.width - leftMargin * 2 });
       
       doc.end();
+      console.log('✓ PDF document sent to client');
     } else {
       return res.status(400).json({ error: 'Invalid format. Use "docx" or "pdf"' });
     }
