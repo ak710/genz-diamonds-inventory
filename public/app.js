@@ -969,7 +969,7 @@ async function generateLineSheet() {
       return;
     }
   } else {
-    discountPercent = parseInt(discountType);
+    discountPercent = parseInt(document.querySelector('input[name="discount"]:checked').value);
   }
   
   const exportFormat = document.getElementById('exportFormat').value;
