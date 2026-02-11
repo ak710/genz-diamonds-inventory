@@ -312,7 +312,9 @@ document.getElementById('searchForm').addEventListener('submit', async function(
   const barcode = document.getElementById('barcode').value.trim();
   const resultDiv = document.getElementById('result');
   resultDiv.innerHTML = 'Searching...';
-  const res = await fetch(`/api/search/${encodeURIComponent(barcode)}`);
+  const res = await fetch(`/api/search/${encodeURIComponent(barcode)}`, {
+    headers: getAuthHeaders()
+  });
   if (res.ok) {
     const data = await res.json();
     if (data && data.record) {
