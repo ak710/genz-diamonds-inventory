@@ -337,7 +337,7 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       doc.pipe(res);
       
       // Add date in top left
-      doc.fontSize(10).text(`Date: ${new Date().toLocaleDateString()}`, 40, 40, { align: 'left' });
+      doc.fontSize(10).fillColor('#8B7355').font('Times-Roman').text(`Date: ${new Date().toLocaleDateString()}`, 40, 40, { align: 'left' });
       
       // Add logo if it exists (centered)
       if (fs.existsSync(logoPath)) {
@@ -388,8 +388,8 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
         // Prevent PDFKit auto-pagination by setting y position
         doc.y = currentY;
         
-        // Draw border box
-        doc.rect(currentX, currentY, boxWidth, boxHeight).stroke('#000000');
+        // Draw border box with gold color
+        doc.rect(currentX, currentY, boxWidth, boxHeight).stroke('#bd9e5e');
         
         // Draw image or placeholder
         const imagePadding = 10;
@@ -407,33 +407,31 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
             });
           } catch (err) {
             // Draw placeholder if image fails
-            doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#cccccc');
-            doc.fillColor('#999999').fontSize(9).text('No Image', imageX, imageY + imageHeight / 2 - 5, {
+            doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#bd9e5e');
+            doc.fillColor('#8B7355').fontSize(9).font('Times-Italic').text('No Image', imageX, imageY + imageHeight / 2 - 5, {
               width: imageWidth,
               align: 'center'
             });
-            doc.fillColor('#000000');
           }
         } else {
-          // Draw gray placeholder box
-          doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#cccccc');
-          doc.fillColor('#999999').fontSize(9).text('No Image', imageX, imageY + imageHeight / 2 - 5, {
+          // Draw gray placeholder box with gold border
+          doc.rect(imageX, imageY, imageWidth, imageHeight).fillAndStroke('#f0f0f0', '#bd9e5e');
+          doc.fillColor('#8B7355').fontSize(9).font('Times-Italic').text('No Image', imageX, imageY + imageHeight / 2 - 5, {
             width: imageWidth,
             align: 'center'
           });
-          doc.fillColor('#000000');
         }
         
-        // Add item details below image - left aligned
+        // Add item details below image - left aligned with light brown text
         const detailsX = currentX + 10;
         const detailsY = imageY + imageHeight + 10;
         const textWidth = boxWidth - 20;
         
-        doc.fontSize(10).font('Helvetica-Bold').text(`SKU: ${item.design}`, detailsX, detailsY, {
+        doc.fillColor('#8B7355').fontSize(10).font('Times-Bold').text(`SKU: ${item.design}`, detailsX, detailsY, {
           width: textWidth,
           align: 'left'
         });
-        doc.fontSize(9).font('Helvetica').text(`Purity: ${item.purity || 'N/A'}`, detailsX, detailsY + 14, {
+        doc.fontSize(9).font('Times-Roman').text(`Purity: ${item.purity || 'N/A'}`, detailsX, detailsY + 14, {
           width: textWidth,
           align: 'left'
         });
@@ -441,11 +439,11 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
           width: textWidth,
           align: 'left'
         });
-        doc.font('Helvetica').text(`Wholesale: $${item.wholesalePrice.toFixed(2)}`, detailsX, detailsY + 42, {
+        doc.font('Times-Roman').text(`Wholesale: $${item.wholesalePrice.toFixed(2)}`, detailsX, detailsY + 42, {
           width: textWidth,
           align: 'left'
         });
-        doc.font('Helvetica-Bold').text(`Suggested Retail: $${item.retailPrice.toFixed(2)}`, detailsX, detailsY + 56, {
+        doc.font('Times-Bold').text(`Suggested Retail: $${item.retailPrice.toFixed(2)}`, detailsX, detailsY + 56, {
           width: textWidth,
           align: 'left'
         });
