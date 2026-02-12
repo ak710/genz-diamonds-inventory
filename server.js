@@ -299,6 +299,32 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       }
     }
     
+    // Helper function to try multiple image URLs with fallback
+    async function fetchImageWithFallback(hdImageUrl, regularImageUrl) {
+      // Try HD Image first
+      if (hdImageUrl) {
+        console.log(`🔍 Trying HD Image URL...`);
+        const buffer = await fetchImage(hdImageUrl);
+        if (buffer) {
+          console.log(`✓ Successfully loaded HD Image`);
+          return buffer;
+        }
+      }
+      
+      // Try regular Image as fallback
+      if (regularImageUrl) {
+        console.log(`🔍 Trying regular Image URL...`);
+        const buffer = await fetchImage(regularImageUrl);
+        if (buffer) {
+          console.log(`✓ Successfully loaded regular Image`);
+          return buffer;
+        }
+      }
+      
+      console.log(`✗ No valid image available, using placeholder`);
+      return null;
+    }
+    
     if (format === 'pdf') {
       console.log('📝 Generating PDF document...');
       // Generate PDF document
@@ -324,10 +350,10 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
       
       doc.moveDown(2);
       
-      // Fetch all images with progress logging
+      // Fetch all images with progress logging and fallback
       console.log(`📥 Fetching images for ${sanitizedItems.length} items...`);
       const imagePromises = sanitizedItems.map(async (item) => {
-        const imageBuffer = await fetchImage(item.image);
+        const imageBuffer = await fetchImageWithFallback(item.hdImageUrl, item.imageUrl);
         return { ...item, imageBuffer };
       });
       const itemsWithImages = await Promise.all(imagePromises);

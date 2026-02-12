@@ -1056,29 +1056,13 @@ async function generateLineSheet() {
       const discountedPrice = roundToNearest5(tagPrice * (1 - discountPercent / 100));
       const retailPrice = roundToNearest5(discountedPrice * 2.5);
       
-      // Try multiple ways to get image URL
-      let imageUrl = null;
-      
-      // Try HD Image first
-      if (f['HD Image']) {
-        if (Array.isArray(f['HD Image']) && f['HD Image'].length > 0) {
-          imageUrl = f['HD Image'][0].url;
-        } else if (typeof f['HD Image'] === 'string') {
-          imageUrl = f['HD Image'];
-        }
-      }
-      
-      // Fallback to Image field
-      if (!imageUrl && f['Image']) {
-        if (Array.isArray(f['Image']) && f['Image'].length > 0) {
-          imageUrl = f['Image'][0].url;
-        } else if (typeof f['Image'] === 'string') {
-          imageUrl = f['Image'];
-        }
-      }
+      // Collect both URLs and send to server - let server validate which one works
+      const hdImageUrl = f['HD Image']?.[0]?.url || (typeof f['HD Image'] === 'string' ? f['HD Image'] : null);
+      const regularImageUrl = f['Image']?.[0]?.url || (typeof f['Image'] === 'string' ? f['Image'] : null);
       
       return {
-        image: imageUrl,
+        hdImageUrl: hdImageUrl,
+        imageUrl: regularImageUrl,
         design: f['Design'] || 'N/A',
         purity: f['Purity'] || '',
         setCts: f['Set Cts.'] || '',
