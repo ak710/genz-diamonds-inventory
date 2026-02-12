@@ -1063,21 +1063,40 @@ async function generateLineSheet() {
       if (f['HD Image']) {
         if (Array.isArray(f['HD Image']) && f['HD Image'].length > 0) {
           imageUrl = f['HD Image'][0].url;
-        } else if (typeof f['HD Image'] === 'string') {
+          console.log(`Item ${f['Design']}: Using HD Image URL`);
+        } else if (typeof f['HD Image'] === 'string' && f['HD Image'].trim()) {
           imageUrl = f['HD Image'];
+          console.log(`Item ${f['Design']}: Using HD Image (string)`);
         }
       }
       
-      // Fallback to regular Image
+      // Fallback to Image field
       if (!imageUrl && f['Image']) {
         if (Array.isArray(f['Image']) && f['Image'].length > 0) {
           imageUrl = f['Image'][0].url;
-        } else if (typeof f['Image'] === 'string') {
+          console.log(`Item ${f['Design']}: Using Image field`);
+        } else if (typeof f['Image'] === 'string' && f['Image'].trim()) {
           imageUrl = f['Image'];
+          console.log(`Item ${f['Design']}: Using Image (string)`);
         }
       }
       
-      console.log(`Item ${f['Design']}: image URL = ${imageUrl ? imageUrl.substring(0, 50) + '...' : 'null'}`);
+      // Fallback to Low Res or Thumbnail if it exists
+      if (!imageUrl && f['Low Res Image']) {
+        if (Array.isArray(f['Low Res Image']) && f['Low Res Image'].length > 0) {
+          imageUrl = f['Low Res Image'][0].url;
+          console.log(`Item ${f['Design']}: Using Low Res Image`);
+        }
+      }
+      
+      if (!imageUrl && f['Thumbnail']) {
+        if (Array.isArray(f['Thumbnail']) && f['Thumbnail'].length > 0) {
+          imageUrl = f['Thumbnail'][0].url;
+          console.log(`Item ${f['Design']}: Using Thumbnail`);
+        }
+      }
+      
+      console.log(`Item ${f['Design']}: Final image URL = ${imageUrl ? imageUrl.substring(0, 50) + '...' : 'null'}`);
       
       return {
         image: imageUrl,
