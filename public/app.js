@@ -1069,6 +1069,27 @@ async function generateLineSheet() {
         wholesalePrice: discountedPrice,
         retailPrice: retailPrice
       };
+    })
+    .sort((a, b) => {
+      // Sort by product type: RN, ER, NT, then others
+      const getProductType = (design) => {
+        const prefix = design.match(/^[A-Z]+/)?.[0] || '';
+        return prefix;
+      };
+      
+      const typeOrder = { 'RN': 1, 'ER': 2, 'NT': 3 };
+      const typeA = getProductType(a.design);
+      const typeB = getProductType(b.design);
+      
+      const orderA = typeOrder[typeA] || 999;
+      const orderB = typeOrder[typeB] || 999;
+      
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      
+      // Within same type, sort alphabetically by design number
+      return a.design.localeCompare(b.design);
     });
   
   try {
