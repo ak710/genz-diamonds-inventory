@@ -410,6 +410,7 @@ function displayItems(items) {
     const selectionCheckbox = !customerMode ? `
       <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
         <input type="checkbox" id="linesheet-check-${item.id}" 
+               onclick="event.stopPropagation()"
                onchange="toggleLineSheetItem('${item.id}', event)" 
                ${isSelectedForLineSheet ? 'checked' : ''}
                style="width: 20px; height: 20px; cursor: pointer;">
