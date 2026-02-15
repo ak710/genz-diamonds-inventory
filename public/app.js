@@ -1074,23 +1074,33 @@ function generateInvoice() {
 }
 
 function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent }) {
-  const rows = items.map((item) => {
+  const lineItems = items.map((item) => {
     const f = item.fields;
-    const image = f['Image'] || '';
-    const design = f['Design'] || 'N/A';
-    const purity = f['Purity'] || '';
-    const setCts = f['Set Cts.'] || '';
-    const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+    const priceRaw = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+    const priceNumber = parseFloat(priceRaw) || 0;
+    return {
+      image: f['Image'] || '',
+      design: f['Design'] || 'N/A',
+      purity: f['Purity'] || '',
+      setCts: f['Set Cts.'] || '',
+      price: priceNumber
+    };
+  });
 
+  const initialSubtotal = lineItems.reduce((sum, item) => sum + item.price, 0);
+  const initialGst = initialSubtotal * (gstPercent / 100);
+  const initialTotal = initialSubtotal + initialGst;
+
+  const rows = lineItems.map((item) => {
     return `
       <tr>
-        <td class="image-cell"><img src="${image}" alt="${design}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3C/svg%3E'" /></td>
-        <td>${design}</td>
-        <td>${purity}</td>
-        <td>${setCts}</td>
+        <td class="image-cell"><img src="${item.image}" alt="${item.design}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3C/svg%3E'" /></td>
+        <td>${item.design}</td>
+        <td>${item.purity}</td>
+        <td>${item.setCts}</td>
         <td contenteditable="true" data-role="qty">1</td>
-        <td contenteditable="true" data-role="price">${parseFloat(price).toFixed(2)}</td>
-        <td data-role="line-total">${parseFloat(price).toFixed(2)}</td>
+        <td contenteditable="true" data-role="price">${item.price.toFixed(2)}</td>
+        <td data-role="line-total">${item.price.toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -1165,15 +1175,15 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
     <table>
       <tr>
         <td class="label">Subtotal</td>
-        <td class="value" id="subtotalValue">0.00</td>
+        <td class="value" id="subtotalValue">${initialSubtotal.toFixed(2)}</td>
       </tr>
       <tr>
         <td class="label">GST</td>
-        <td class="value" id="gstValue">0.00</td>
+        <td class="value" id="gstValue">${initialGst.toFixed(2)}</td>
       </tr>
       <tr>
         <td class="label">Total</td>
-        <td class="value" id="totalValue">0.00</td>
+        <td class="value" id="totalValue">${initialTotal.toFixed(2)}</td>
       </tr>
     </table>
   </div>
@@ -1220,7 +1230,8 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       }
     });
 
-    window.addEventListener('load', recalcTotals);
+    document.addEventListener('DOMContentLoaded', recalcTotals);
+    recalcTotals();
   </script>
 </body>
 </html>
