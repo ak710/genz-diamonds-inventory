@@ -934,8 +934,8 @@ async function processInvoiceScan(jobNo) {
   const feedbackDiv = document.getElementById('invoiceScanFeedback');
 
   try {
-    const existing = invoiceItems.find(item => item.fields['Job No.'] === jobNo);
-    if (existing) {
+    const duplicateJobNo = invoiceItems.find(item => item.jobNos && item.jobNos.includes(jobNo));
+    if (duplicateJobNo) {
       feedbackDiv.className = 'scan-feedback scan-duplicate';
       feedbackDiv.textContent = `⚠️ Already added: ${jobNo}`;
       if (scanAudio.error) scanAudio.error.play().catch(() => {});
@@ -952,10 +952,20 @@ async function processInvoiceScan(jobNo) {
     if (!data || !data.record) throw new Error('Not found');
 
     const item = data.record;
-    invoiceItems.unshift({ ...item, scannedAt: new Date() });
+    const design = item.fields['Design'] || 'N/A';
+    const existingDesign = invoiceItems.find(existingItem => (existingItem.fields['Design'] || 'N/A') === design);
 
-    feedbackDiv.className = 'scan-feedback scan-success';
-    feedbackDiv.textContent = `✓ Added: ${item.fields['Design'] || jobNo}`;
+    if (existingDesign) {
+      existingDesign.qty = (existingDesign.qty || 1) + 1;
+      existingDesign.jobNos = existingDesign.jobNos || [];
+      existingDesign.jobNos.push(jobNo);
+      feedbackDiv.className = 'scan-feedback scan-success';
+      feedbackDiv.textContent = `✓ Updated Qty: ${design} (${existingDesign.qty})`;
+    } else {
+      invoiceItems.unshift({ ...item, scannedAt: new Date(), qty: 1, jobNos: [jobNo] });
+      feedbackDiv.className = 'scan-feedback scan-success';
+      feedbackDiv.textContent = `✓ Added: ${item.fields['Design'] || jobNo}`;
+    }
     if (scanAudio.success) scanAudio.success.play().catch(() => {});
 
     updateInvoiceStats();
@@ -972,11 +982,13 @@ async function processInvoiceScan(jobNo) {
 
 // Update invoice stats
 function updateInvoiceStats() {
-  document.getElementById('invoiceItemCount').textContent = invoiceItems.length;
+  const totalItems = invoiceItems.reduce((sum, item) => sum + (item.qty || 1), 0);
+  document.getElementById('invoiceItemCount').textContent = totalItems;
 
   const subtotal = invoiceItems.reduce((sum, item) => {
     const price = item.fields['Tag Price Rounded (CAD)'] || item.fields['Tag Price (CAD)'] || 0;
-    return sum + price;
+    const qty = item.qty || 1;
+    return sum + (price * qty);
   }, 0);
 
   const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
@@ -1007,6 +1019,7 @@ function displayInvoiceItems() {
     const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 'N/A';
     const purity = f['Purity'] || '';
     const setCts = f['Set Cts.'] || '';
+    const qty = item.qty || 1;
 
     html += `
       <div class="scanned-item">
@@ -1014,6 +1027,7 @@ function displayInvoiceItems() {
         <div class="scanned-item-details">
           <div><strong>${design}</strong></div>
           <div>Job No: ${jobNo} | Purity: ${purity} | Set Cts.: ${setCts}</div>
+          <div>Qty: ${qty}</div>
           <div>$${price} CAD</div>
           <div class="scanned-item-time">Added at ${time}</div>
         </div>
@@ -1083,11 +1097,12 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       design: f['Design'] || 'N/A',
       purity: f['Purity'] || '',
       setCts: f['Set Cts.'] || '',
-      price: priceNumber
+      price: priceNumber,
+      qty: item.qty || 1
     };
   });
 
-  const initialSubtotal = lineItems.reduce((sum, item) => sum + item.price, 0);
+  const initialSubtotal = lineItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const initialGst = initialSubtotal * (gstPercent / 100);
   const initialTotal = initialSubtotal + initialGst;
 
@@ -1098,9 +1113,9 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
         <td>${item.design}</td>
         <td>${item.purity}</td>
         <td>${item.setCts}</td>
-        <td contenteditable="true" data-role="qty">1</td>
+        <td contenteditable="true" data-role="qty">${item.qty}</td>
         <td contenteditable="true" data-role="price">${item.price.toFixed(2)}</td>
-        <td data-role="line-total">${item.price.toFixed(2)}</td>
+        <td data-role="line-total">${(item.price * item.qty).toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -1224,12 +1239,21 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       document.getElementById('totalValue').textContent = total.toFixed(2);
     }
 
-    document.addEventListener('input', (event) => {
-      if (event.target.matches('[data-role="qty"], [data-role="price"], #gstPercent')) {
-        recalcTotals();
-      }
-    });
+    function isRecalcTarget(target) {
+      return target && (target.matches('[data-role="qty"], [data-role="price"], #gstPercent'));
+    }
 
+    function bindRecalcHandlers() {
+      ['input', 'keyup', 'blur', 'paste'].forEach(evt => {
+        document.addEventListener(evt, (event) => {
+          if (isRecalcTarget(event.target)) {
+            recalcTotals();
+          }
+        });
+      });
+    }
+
+    bindRecalcHandlers();
     document.addEventListener('DOMContentLoaded', recalcTotals);
     recalcTotals();
   </script>
