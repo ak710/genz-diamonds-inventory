@@ -986,7 +986,9 @@ function updateInvoiceStats() {
   document.getElementById('invoiceItemCount').textContent = totalItems;
 
   const subtotal = invoiceItems.reduce((sum, item) => {
-    const price = item.fields['Tag Price Rounded (CAD)'] || item.fields['Tag Price (CAD)'] || 0;
+    const price = typeof item.priceOverride === 'number'
+      ? item.priceOverride
+      : (item.fields['Tag Price Rounded (CAD)'] || item.fields['Tag Price (CAD)'] || 0);
     const qty = item.qty || 1;
     return sum + (price * qty);
   }, 0);
@@ -1016,7 +1018,8 @@ function displayInvoiceItems() {
     const image = f['Image'] || '';
     const design = f['Design'] || 'N/A';
     const jobNo = f['Job No.'] || 'N/A';
-    const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 'N/A';
+    const basePrice = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+    const price = typeof item.priceOverride === 'number' ? item.priceOverride : basePrice;
     const purity = f['Purity'] || '';
     const setCts = f['Set Cts.'] || '';
     const qty = item.qty || 1;
@@ -1028,7 +1031,17 @@ function displayInvoiceItems() {
           <div><strong>${design}</strong></div>
           <div>Job No: ${jobNo} | Purity: ${purity} | Set Cts.: ${setCts}</div>
           <div>Qty: ${qty}</div>
-          <div>$${price} CAD</div>
+          <div>
+            <label style="font-size: 0.85em; color: #666;">Price (CAD):</label>
+            <input 
+              type="number" 
+              min="0" 
+              step="0.01" 
+              value="${parseFloat(price).toFixed(2)}" 
+              oninput="updateInvoiceItemPrice(${index}, this.value)"
+              style="margin-left: 0.5em; padding: 0.25em 0.5em; width: 120px;"
+            />
+          </div>
           <div class="scanned-item-time">Added at ${time}</div>
         </div>
         <button onclick="removeInvoiceItem(${index})" style="padding: 0.5em; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">Remove</button>
@@ -1044,6 +1057,17 @@ function removeInvoiceItem(index) {
   invoiceItems.splice(index, 1);
   updateInvoiceStats();
   displayInvoiceItems();
+}
+
+// Update invoice item price before generating invoice
+function updateInvoiceItemPrice(index, value) {
+  const priceNumber = parseFloat(value);
+  if (!Number.isFinite(priceNumber)) {
+    return;
+  }
+  if (!invoiceItems[index]) return;
+  invoiceItems[index].priceOverride = priceNumber;
+  updateInvoiceStats();
 }
 
 // Clear invoice items
@@ -1090,7 +1114,9 @@ function generateInvoice() {
 function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent }) {
   const lineItems = items.map((item) => {
     const f = item.fields;
-    const priceRaw = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+    const priceRaw = typeof item.priceOverride === 'number'
+      ? item.priceOverride
+      : (f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0);
     const priceNumber = parseFloat(priceRaw) || 0;
     return {
       image: f['Image'] || '',
@@ -1113,8 +1139,8 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
         <td>${item.design}</td>
         <td>${item.purity}</td>
         <td>${item.setCts}</td>
-        <td contenteditable="true" data-role="qty">${item.qty}</td>
-        <td contenteditable="true" data-role="price">${item.price.toFixed(2)}</td>
+        <td contenteditable="true" data-role="qty" oninput="recalcTotals()" onblur="recalcTotals()">${item.qty}</td>
+        <td contenteditable="true" data-role="price" oninput="recalcTotals()" onblur="recalcTotals()">${item.price.toFixed(2)}</td>
         <td data-role="line-total">${(item.price * item.qty).toFixed(2)}</td>
       </tr>
     `;
@@ -1165,7 +1191,7 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
     <div class="meta">
       <div>Invoice #: <span class="editable" contenteditable="true">${invoiceNumber}</span></div>
       <div>Date: <span class="editable" contenteditable="true">${invoiceDate}</span></div>
-      <div>GST %: <span id="gstPercent" class="editable" contenteditable="true">${gstPercent.toFixed(2)}</span></div>
+      <div>GST %: <span id="gstPercent" class="editable" contenteditable="true" oninput="recalcTotals()" onblur="recalcTotals()">${gstPercent.toFixed(2)}</span></div>
     </div>
   </div>
 
@@ -1190,15 +1216,15 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
     <table>
       <tr>
         <td class="label">Subtotal</td>
-        <td class="value" id="subtotalValue">${initialSubtotal.toFixed(2)}</td>
+        <td class="value" id="subtotalValue" data-role="summary-subtotal">${initialSubtotal.toFixed(2)}</td>
       </tr>
       <tr>
         <td class="label">GST</td>
-        <td class="value" id="gstValue">${initialGst.toFixed(2)}</td>
+        <td class="value" id="gstValue" data-role="summary-gst">${initialGst.toFixed(2)}</td>
       </tr>
       <tr>
         <td class="label">Total</td>
-        <td class="value" id="totalValue">${initialTotal.toFixed(2)}</td>
+        <td class="value" id="totalValue" data-role="summary-total">${initialTotal.toFixed(2)}</td>
       </tr>
     </table>
   </div>
@@ -1234,26 +1260,17 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       const gst = subtotal * (gstPercent / 100);
       const total = subtotal + gst;
 
-      document.getElementById('subtotalValue').textContent = subtotal.toFixed(2);
-      document.getElementById('gstValue').textContent = gst.toFixed(2);
-      document.getElementById('totalValue').textContent = total.toFixed(2);
-    }
-
-    function isRecalcTarget(target) {
-      return target && (target.matches('[data-role="qty"], [data-role="price"], #gstPercent'));
-    }
-
-    function bindRecalcHandlers() {
-      ['input', 'keyup', 'blur', 'paste'].forEach(evt => {
-        document.addEventListener(evt, (event) => {
-          if (isRecalcTarget(event.target)) {
-            recalcTotals();
-          }
-        });
+      document.querySelectorAll('[data-role="summary-subtotal"]').forEach(el => {
+        el.textContent = subtotal.toFixed(2);
+      });
+      document.querySelectorAll('[data-role="summary-gst"]').forEach(el => {
+        el.textContent = gst.toFixed(2);
+      });
+      document.querySelectorAll('[data-role="summary-total"]').forEach(el => {
+        el.textContent = total.toFixed(2);
       });
     }
 
-    bindRecalcHandlers();
     document.addEventListener('DOMContentLoaded', recalcTotals);
     recalcTotals();
   </script>
