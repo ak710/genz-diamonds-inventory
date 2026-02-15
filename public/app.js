@@ -1,6 +1,7 @@
 let allItems = [];
 let filteredItems = [];
 let scannedItems = [];
+let invoiceItems = [];
 let scanAudio = null;
 let authToken = localStorage.getItem('authToken') || null;
 let customerMode = localStorage.getItem('customerMode') === 'true' || false;
@@ -35,6 +36,7 @@ function toggleCustomerMode() {
   // Hide/show Line Sheet tab (3rd tab) and Take Inventory tab (4th tab)
   const linesheetTabButton = document.querySelector('.tab:nth-child(3)');
   const inventoryTabButton = document.querySelector('.tab:nth-child(4)');
+  const invoiceTabButton = document.querySelector('.tab:nth-child(5)');
   
   if (linesheetTabButton) {
     linesheetTabButton.style.display = customerMode ? 'none' : 'block';
@@ -42,11 +44,15 @@ function toggleCustomerMode() {
   if (inventoryTabButton) {
     inventoryTabButton.style.display = customerMode ? 'none' : 'block';
   }
+  if (invoiceTabButton) {
+    invoiceTabButton.style.display = customerMode ? 'none' : 'block';
+  }
   
   // If currently on line sheet or inventory tab and switching to customer mode, switch to browse
   if (customerMode) {
     if (document.getElementById('linesheetTab').classList.contains('active') || 
-        document.getElementById('inventoryTab').classList.contains('active')) {
+        document.getElementById('inventoryTab').classList.contains('active') ||
+        document.getElementById('invoiceTab').classList.contains('active')) {
       switchTab('browse');
     }
   }
@@ -74,11 +80,15 @@ document.addEventListener('DOMContentLoaded', function() {
   if (customerMode) {
     const linesheetTabButton = document.querySelector('.tab:nth-child(3)');
     const inventoryTabButton = document.querySelector('.tab:nth-child(4)');
+    const invoiceTabButton = document.querySelector('.tab:nth-child(5)');
     if (linesheetTabButton) {
       linesheetTabButton.style.display = 'none';
     }
     if (inventoryTabButton) {
       inventoryTabButton.style.display = 'none';
+    }
+    if (invoiceTabButton) {
+      invoiceTabButton.style.display = 'none';
     }
   }
 });
@@ -208,6 +218,10 @@ function switchTab(tab) {
     document.querySelector('.tab:nth-child(4)').classList.add('active');
     document.getElementById('inventoryTab').classList.add('active');
     document.getElementById('inventoryScan').focus();
+  } else if (tab === 'invoice') {
+    document.querySelector('.tab:nth-child(5)').classList.add('active');
+    document.getElementById('invoiceTab').classList.add('active');
+    document.getElementById('invoiceScan').focus();
   }
 }
 
@@ -698,6 +712,13 @@ window.addEventListener('DOMContentLoaded', () => {
   loadAllItems();
   initAudio();
   setupInventoryScanning();
+  setupInvoiceScanning();
+  const invoiceDateInput = document.getElementById('invoiceDate');
+  if (invoiceDateInput && !invoiceDateInput.value) {
+    invoiceDateInput.value = new Date().toISOString().slice(0, 10);
+  }
+  updateInvoiceStats();
+  displayInvoiceItems();
 });
 
 // Inventory scanning setup
@@ -881,6 +902,329 @@ function exportInventory() {
   a.download = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Invoice scanning setup
+function setupInvoiceScanning() {
+  const form = document.getElementById('invoiceForm');
+  const input = document.getElementById('invoiceScan');
+  const gstInput = document.getElementById('invoiceGstPercent');
+
+  if (!form || !input) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const jobNo = input.value.trim();
+    if (!jobNo) return;
+
+    input.value = '';
+    await processInvoiceScan(jobNo);
+    input.focus();
+  });
+
+  if (gstInput) {
+    gstInput.addEventListener('input', () => {
+      updateInvoiceStats();
+    });
+  }
+}
+
+// Process invoice scan
+async function processInvoiceScan(jobNo) {
+  const feedbackDiv = document.getElementById('invoiceScanFeedback');
+
+  try {
+    const existing = invoiceItems.find(item => item.fields['Job No.'] === jobNo);
+    if (existing) {
+      feedbackDiv.className = 'scan-feedback scan-duplicate';
+      feedbackDiv.textContent = `⚠️ Already added: ${jobNo}`;
+      if (scanAudio.error) scanAudio.error.play().catch(() => {});
+      setTimeout(() => feedbackDiv.className = 'scan-feedback', 2000);
+      return;
+    }
+
+    const res = await fetch(`/api/search/${encodeURIComponent(jobNo)}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Not found');
+
+    const data = await res.json();
+    if (!data || !data.record) throw new Error('Not found');
+
+    const item = data.record;
+    invoiceItems.unshift({ ...item, scannedAt: new Date() });
+
+    feedbackDiv.className = 'scan-feedback scan-success';
+    feedbackDiv.textContent = `✓ Added: ${item.fields['Design'] || jobNo}`;
+    if (scanAudio.success) scanAudio.success.play().catch(() => {});
+
+    updateInvoiceStats();
+    displayInvoiceItems();
+
+    setTimeout(() => feedbackDiv.className = 'scan-feedback', 1500);
+  } catch (err) {
+    feedbackDiv.className = 'scan-feedback scan-error';
+    feedbackDiv.textContent = `✗ Not found: ${jobNo}`;
+    if (scanAudio.error) scanAudio.error.play().catch(() => {});
+    setTimeout(() => feedbackDiv.className = 'scan-feedback', 2000);
+  }
+}
+
+// Update invoice stats
+function updateInvoiceStats() {
+  document.getElementById('invoiceItemCount').textContent = invoiceItems.length;
+
+  const subtotal = invoiceItems.reduce((sum, item) => {
+    const price = item.fields['Tag Price Rounded (CAD)'] || item.fields['Tag Price (CAD)'] || 0;
+    return sum + price;
+  }, 0);
+
+  const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
+  const gstAmount = subtotal * (gstPercent / 100);
+  const total = subtotal + gstAmount;
+
+  document.getElementById('invoiceSubtotal').textContent = `$${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  document.getElementById('invoiceTotal').textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Display invoice items
+function displayInvoiceItems() {
+  const container = document.getElementById('invoiceItems');
+
+  if (invoiceItems.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999;">No items added yet. Start scanning barcodes above.</p>';
+    return;
+  }
+
+  let html = '<h3>Invoice Items</h3>';
+
+  invoiceItems.forEach((item, index) => {
+    const f = item.fields;
+    const time = item.scannedAt.toLocaleTimeString();
+    const image = f['Image'] || '';
+    const design = f['Design'] || 'N/A';
+    const jobNo = f['Job No.'] || 'N/A';
+    const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 'N/A';
+    const purity = f['Purity'] || '';
+    const setCts = f['Set Cts.'] || '';
+
+    html += `
+      <div class="scanned-item">
+        <img src="${image}" alt="${design}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2260%22 height=%2260%22/%3E%3C/svg%3E'">
+        <div class="scanned-item-details">
+          <div><strong>${design}</strong></div>
+          <div>Job No: ${jobNo} | Purity: ${purity} | Set Cts.: ${setCts}</div>
+          <div>$${price} CAD</div>
+          <div class="scanned-item-time">Added at ${time}</div>
+        </div>
+        <button onclick="removeInvoiceItem(${index})" style="padding: 0.5em; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">Remove</button>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// Remove invoice item
+function removeInvoiceItem(index) {
+  invoiceItems.splice(index, 1);
+  updateInvoiceStats();
+  displayInvoiceItems();
+}
+
+// Clear invoice items
+function clearInvoiceItems() {
+  if (invoiceItems.length === 0) return;
+  if (!confirm(`Clear all ${invoiceItems.length} invoice items?`)) return;
+
+  invoiceItems = [];
+  updateInvoiceStats();
+  displayInvoiceItems();
+  document.getElementById('invoiceScan').focus();
+}
+
+// Generate editable HTML invoice
+function generateInvoice() {
+  if (invoiceItems.length === 0) {
+    alert('No items added to invoice.');
+    return;
+  }
+
+  const customerName = document.getElementById('invoiceCustomerName').value.trim() || 'Customer';
+  const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().slice(0, 10);
+  const invoiceNumber = document.getElementById('invoiceNumber').value.trim() || `INV-${Date.now().toString().slice(-6)}`;
+  const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
+
+  const html = buildInvoiceHtml({
+    items: invoiceItems,
+    customerName,
+    invoiceDate,
+    invoiceNumber,
+    gstPercent
+  });
+
+  const invoiceWindow = window.open('', '_blank');
+  if (!invoiceWindow) {
+    alert('Popup blocked. Please allow popups to open the invoice.');
+    return;
+  }
+  invoiceWindow.document.open();
+  invoiceWindow.document.write(html);
+  invoiceWindow.document.close();
+}
+
+function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent }) {
+  const rows = items.map((item) => {
+    const f = item.fields;
+    const image = f['Image'] || '';
+    const design = f['Design'] || 'N/A';
+    const purity = f['Purity'] || '';
+    const setCts = f['Set Cts.'] || '';
+    const price = f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0;
+
+    return `
+      <tr>
+        <td class="image-cell"><img src="${image}" alt="${design}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3C/svg%3E'" /></td>
+        <td>${design}</td>
+        <td>${purity}</td>
+        <td>${setCts}</td>
+        <td contenteditable="true" data-role="qty">1</td>
+        <td contenteditable="true" data-role="price">${parseFloat(price).toFixed(2)}</td>
+        <td data-role="line-total">${parseFloat(price).toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice ${invoiceNumber}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+    .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; gap: 20px; }
+    .invoice-logo { width: 140px; height: auto; margin-bottom: 10px; }
+    .invoice-title { font-size: 28px; font-weight: bold; margin: 0; }
+    .meta { text-align: right; }
+    .meta div { margin-bottom: 6px; }
+    .editable { padding: 2px 4px; border-bottom: 1px dashed #999; min-width: 120px; display: inline-block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f8f9fa; }
+    .image-cell img { width: 50px; height: 50px; object-fit: cover; }
+    .summary { margin-top: 20px; display: flex; justify-content: flex-end; }
+    .summary table { width: 320px; }
+    .summary td { border: none; padding: 6px 8px; }
+    .summary .label { text-align: right; color: #666; }
+    .summary .value { text-align: right; font-weight: bold; }
+    .actions { margin-top: 20px; display: flex; gap: 10px; }
+    .btn { padding: 10px 16px; border: none; cursor: pointer; border-radius: 4px; }
+    .btn-primary { background: #28a745; color: white; }
+    .btn-secondary { background: #6c757d; color: white; }
+    @media print {
+      .actions { display: none; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-header">
+    <div>
+      <img src="/assets/logo.png" alt="Company Logo" class="invoice-logo" onerror="this.style.display='none'" />
+      <div class="invoice-title">Invoice</div>
+      <div>Customer: <span class="editable" contenteditable="true">${customerName}</span></div>
+      <div>Notes: <span class="editable" contenteditable="true">Thank you for your business.</span></div>
+    </div>
+    <div class="meta">
+      <div>Invoice #: <span class="editable" contenteditable="true">${invoiceNumber}</span></div>
+      <div>Date: <span class="editable" contenteditable="true">${invoiceDate}</span></div>
+      <div>GST %: <span id="gstPercent" class="editable" contenteditable="true">${gstPercent.toFixed(2)}</span></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Image</th>
+        <th>Design No</th>
+        <th>Purity</th>
+        <th>Set Cts</th>
+        <th>Qty</th>
+        <th>Price (CAD)</th>
+        <th>Total (CAD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <table>
+      <tr>
+        <td class="label">Subtotal</td>
+        <td class="value" id="subtotalValue">0.00</td>
+      </tr>
+      <tr>
+        <td class="label">GST</td>
+        <td class="value" id="gstValue">0.00</td>
+      </tr>
+      <tr>
+        <td class="label">Total</td>
+        <td class="value" id="totalValue">0.00</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="window.print()">Save as PDF</button>
+    <button class="btn btn-primary" onclick="window.close()">Close</button>
+  </div>
+
+  <script>
+    function parseNumber(value) {
+      if (!value) return 0;
+      return parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
+    }
+
+    function recalcTotals() {
+      const rows = document.querySelectorAll('tbody tr');
+      let subtotal = 0;
+
+      rows.forEach(row => {
+        const qtyEl = row.querySelector('[data-role="qty"]');
+        const priceEl = row.querySelector('[data-role="price"]');
+        const totalEl = row.querySelector('[data-role="line-total"]');
+
+        const qty = parseNumber(qtyEl.textContent);
+        const price = parseNumber(priceEl.textContent);
+        const lineTotal = qty * price;
+        totalEl.textContent = lineTotal.toFixed(2);
+        subtotal += lineTotal;
+      });
+
+      const gstPercent = parseNumber(document.getElementById('gstPercent').textContent);
+      const gst = subtotal * (gstPercent / 100);
+      const total = subtotal + gst;
+
+      document.getElementById('subtotalValue').textContent = subtotal.toFixed(2);
+      document.getElementById('gstValue').textContent = gst.toFixed(2);
+      document.getElementById('totalValue').textContent = total.toFixed(2);
+    }
+
+    document.addEventListener('input', (event) => {
+      if (event.target.matches('[data-role="qty"], [data-role="price"], #gstPercent')) {
+        recalcTotals();
+      }
+    });
+
+    window.addEventListener('load', recalcTotals);
+  </script>
+</body>
+</html>
+  `;
 }
 
 // Line Sheet Generator Functions

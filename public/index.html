@@ -413,6 +413,7 @@
       <button class="tab" onclick="switchTab('search')">Search by Barcode</button>
       <button class="tab" onclick="switchTab('linesheet')">Line Sheet</button>
       <button class="tab" onclick="switchTab('inventory')">Take Inventory</button>
+      <button class="tab" onclick="switchTab('invoice')">Invoice</button>
     </div>
     
     <!-- Browse All Tab -->
@@ -537,6 +538,64 @@
         </div>
         
         <div id="scannedItems" class="scanned-items"></div>
+      </div>
+    </div>
+
+    <!-- Invoice Tab -->
+    <div id="invoiceTab" class="tab-content">
+      <div class="inventory-section">
+        <div class="inventory-header">
+          <h2>Invoice Generator - Scan Barcodes</h2>
+          <div class="inventory-stats">
+            <div class="stat-box">
+              <div class="stat-number" id="invoiceItemCount">0</div>
+              <div class="stat-label">Items Added</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number" id="invoiceSubtotal">$0</div>
+              <div class="stat-label">Subtotal (CAD)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number" id="invoiceTotal">$0</div>
+              <div class="stat-label">Total (CAD)</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 1.5em; border-radius: 8px; margin-bottom: 2em; border: 1px solid #dee2e6;">
+          <h3 style="margin-top: 0; font-size: 1.1em;">Invoice Details</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1em;">
+            <div class="filter-group">
+              <label>Customer Name</label>
+              <input type="text" id="invoiceCustomerName" placeholder="Customer name">
+            </div>
+            <div class="filter-group">
+              <label>Invoice Date</label>
+              <input type="date" id="invoiceDate">
+            </div>
+            <div class="filter-group">
+              <label>Invoice Number</label>
+              <input type="text" id="invoiceNumber" placeholder="INV-0001">
+            </div>
+            <div class="filter-group">
+              <label>GST %</label>
+              <input type="number" id="invoiceGstPercent" min="0" max="100" step="0.01" value="5">
+            </div>
+          </div>
+        </div>
+
+        <form id="invoiceForm">
+          <input type="text" id="invoiceScan" placeholder="Scan barcode..." autocomplete="off">
+        </form>
+
+        <div id="invoiceScanFeedback" class="scan-feedback"></div>
+
+        <div class="inventory-actions">
+          <button onclick="clearInvoiceItems()" class="btn-secondary">Clear All</button>
+          <button onclick="generateInvoice()" class="btn-primary">Generate Invoice</button>
+        </div>
+
+        <div id="invoiceItems" class="scanned-items"></div>
       </div>
     </div>
 
