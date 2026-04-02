@@ -1548,7 +1548,7 @@ async function checkQboStatus() {
 }
 
 function connectQuickBooks() {
-  window.open('/api/qbo/connect', '_blank', 'width=600,height=700');
+  window.open(`/api/qbo/connect?token=${encodeURIComponent(authToken)}`, '_blank', 'width=600,height=700');
   // Poll for connection after user completes OAuth
   const poll = setInterval(async () => {
     const res = await fetch('/api/qbo/status', { headers: getAuthHeaders() });

@@ -579,7 +579,9 @@ app.get('/api/qbo/status', requireAuth, (req, res) => {
 });
 
 // Start OAuth flow - redirect browser to QBO login
-app.get('/api/qbo/connect', requireAuth, (req, res) => {
+// Uses query param auth since this is a browser redirect (no headers)
+app.get('/api/qbo/connect', (req, res) => {
+  if (req.query.token !== ACCESS_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   if (!QBO_CLIENT_ID || !QBO_CLIENT_SECRET) {
     return res.status(500).send('QBO_CLIENT_ID and QBO_CLIENT_SECRET must be set in .env');
   }
