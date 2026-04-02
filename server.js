@@ -21,7 +21,9 @@ const QBO_CLIENT_ID = process.env.INTUIT_CLIENT_ID;
 const QBO_CLIENT_SECRET = process.env.INTUIT_CLIENT_SECRET;
 const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'http://localhost:3000/api/qbo/callback';
 const QBO_ENVIRONMENT = process.env.QBO_ENVIRONMENT || 'sandbox'; // 'sandbox' or 'production'
-const QBO_TOKENS_FILE = path.join(__dirname, '.qbo_tokens.json');
+const AIRTABLE_SETTINGS_TABLE = process.env.AIRTABLE_SETTINGS_TABLE || 'Settings';
+const AIRTABLE_REST = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_SETTINGS_TABLE)}`;
+const AIRTABLE_HEADERS = { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`, 'Content-Type': 'application/json' };
 
 function getQboClient() {
   return new OAuthClient({
@@ -33,21 +35,41 @@ function getQboClient() {
   });
 }
 
-function loadQboTokens() {
+async function loadQboTokens() {
   try {
-    if (fs.existsSync(QBO_TOKENS_FILE)) {
-      return JSON.parse(fs.readFileSync(QBO_TOKENS_FILE, 'utf8'));
+    const res = await axios.get(AIRTABLE_REST, {
+      headers: AIRTABLE_HEADERS,
+      params: { filterByFormula: `{Key} = "qbo_tokens"`, maxRecords: 1 }
+    });
+    const records = res.data.records;
+    if (records && records.length > 0) {
+      return JSON.parse(records[0].fields.Value);
     }
-  } catch (e) {}
+  } catch (e) { console.error('loadQboTokens error:', e.message); }
   return null;
 }
 
-function saveQboTokens(tokenData) {
-  fs.writeFileSync(QBO_TOKENS_FILE, JSON.stringify(tokenData, null, 2));
+async function saveQboTokens(tokenData) {
+  const value = JSON.stringify(tokenData);
+  // Check if record already exists
+  const res = await axios.get(AIRTABLE_REST, {
+    headers: AIRTABLE_HEADERS,
+    params: { filterByFormula: `{Key} = "qbo_tokens"`, maxRecords: 1 }
+  });
+  const records = res.data.records;
+  if (records && records.length > 0) {
+    await axios.patch(AIRTABLE_REST, {
+      records: [{ id: records[0].id, fields: { Key: 'qbo_tokens', Value: value } }]
+    }, { headers: AIRTABLE_HEADERS });
+  } else {
+    await axios.post(AIRTABLE_REST, {
+      records: [{ fields: { Key: 'qbo_tokens', Value: value } }]
+    }, { headers: AIRTABLE_HEADERS });
+  }
 }
 
 async function getValidQboToken() {
-  const saved = loadQboTokens();
+  const saved = await loadQboTokens();
   if (!saved || !saved.realmId) throw new Error('QuickBooks not connected. Please connect first.');
 
   const oauthClient = getQboClient();
@@ -55,7 +77,7 @@ async function getValidQboToken() {
 
   if (!oauthClient.isAccessTokenValid()) {
     await oauthClient.refresh();
-    saveQboTokens({ ...oauthClient.getToken(), realmId: saved.realmId });
+    await saveQboTokens({ ...oauthClient.getToken(), realmId: saved.realmId });
   }
 
   return { accessToken: oauthClient.getToken().access_token, realmId: saved.realmId };
@@ -570,8 +592,8 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
 // ── QuickBooks Online Routes ──────────────────────────────────────────────────
 
 // Check connection status
-app.get('/api/qbo/status', requireAuth, (req, res) => {
-  const tokens = loadQboTokens();
+app.get('/api/qbo/status', requireAuth, async (req, res) => {
+  const tokens = await loadQboTokens();
   res.json({ connected: !!(tokens && tokens.realmId) });
 });
 
@@ -596,7 +618,7 @@ app.get('/api/qbo/callback', async (req, res) => {
     const oauthClient = getQboClient();
     const tokenResponse = await oauthClient.createToken(req.url);
     const realmId = req.query.realmId;
-    saveQboTokens({ ...tokenResponse.getJson(), realmId });
+    await saveQboTokens({ ...tokenResponse.getJson(), realmId });
     res.send('<h2>QuickBooks connected successfully! You can close this tab.</h2>');
   } catch (err) {
     console.error('QBO callback error:', err);
@@ -605,9 +627,23 @@ app.get('/api/qbo/callback', async (req, res) => {
 });
 
 // Disconnect QBO
-app.post('/api/qbo/disconnect', requireAuth, (req, res) => {
-  if (fs.existsSync(QBO_TOKENS_FILE)) fs.unlinkSync(QBO_TOKENS_FILE);
-  res.json({ success: true });
+app.post('/api/qbo/disconnect', requireAuth, async (req, res) => {
+  try {
+    const saved = await loadQboTokens();
+    if (saved) {
+      const findRes = await axios.get(AIRTABLE_REST, {
+        headers: AIRTABLE_HEADERS,
+        params: { filterByFormula: `{Key} = "qbo_tokens"`, maxRecords: 1 }
+      });
+      const records = findRes.data.records;
+      if (records && records.length > 0) {
+        await axios.delete(`${AIRTABLE_REST}/${records[0].id}`, { headers: AIRTABLE_HEADERS });
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Push invoice to QuickBooks
