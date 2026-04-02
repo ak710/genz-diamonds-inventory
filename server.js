@@ -663,24 +663,25 @@ app.post('/api/qbo/invoice', requireAuth, async (req, res) => {
     const customerId = await getOrCreateCustomer(baseUrl, accessToken, customerName || 'Customer');
     const itemId = await getOrCreateJewelryItem(baseUrl, accessToken);
 
-    const lineItems = items.map((item, i) => ({
+    const lineItems = items.map((item) => ({
       Amount: parseFloat((item.price * item.qty).toFixed(2)),
       DetailType: 'SalesItemLineDetail',
       Description: `${item.design}${item.purity ? ' | ' + item.purity : ''}${item.setCts ? ' | ' + item.setCts + ' ct' : ''}`,
       SalesItemLineDetail: {
         ItemRef: { value: itemId },
         Qty: item.qty,
-        UnitPrice: parseFloat(item.price.toFixed(2))
+        UnitPrice: parseFloat(item.price.toFixed(2)),
+        TaxCodeRef: { value: 'NON' }
       }
     }));
 
     const invoicePayload = {
-      DocNumber: invoiceNumber || undefined,
       TxnDate: invoiceDate || new Date().toISOString().slice(0, 10),
       CustomerRef: { value: customerId },
       Line: lineItems,
-      TxnTaxDetail: gstPercent > 0 ? undefined : undefined // QBO handles tax via tax codes; omit for simplicity
+      GlobalTaxCalculation: 'NotApplicable'
     };
+    if (invoiceNumber) invoicePayload.DocNumber = invoiceNumber;
 
     const createRes = await axios.post(
       `${baseUrl}/invoice`,
@@ -693,8 +694,11 @@ app.post('/api/qbo/invoice', requireAuth, async (req, res) => {
     res.json({ success: true, invoiceId: created.Id, docNumber: created.DocNumber });
 
   } catch (err) {
-    console.error('❌ QBO invoice error:', err.response?.data || err.message);
-    const detail = err.response?.data?.Fault?.Error?.[0]?.Message || err.message;
+    const qboErrors = err.response?.data?.Fault?.Error;
+    console.error('❌ QBO invoice error:', JSON.stringify(err.response?.data || err.message, null, 2));
+    const detail = qboErrors
+      ? qboErrors.map(e => `${e.Message} (code ${e.code})`).join('; ')
+      : err.message;
     res.status(500).json({ error: detail });
   }
 });
