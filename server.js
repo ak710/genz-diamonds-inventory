@@ -19,10 +19,7 @@ const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || 'genz2026';
 // QuickBooks Online config
 const QBO_CLIENT_ID = process.env.INTUIT_CLIENT_ID;
 const QBO_CLIENT_SECRET = process.env.INTUIT_CLIENT_SECRET;
-const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI ||
-  (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/api/qbo/callback`
-    : 'http://localhost:3000/api/qbo/callback');
+const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'http://localhost:3000/api/qbo/callback';
 const QBO_ENVIRONMENT = process.env.QBO_ENVIRONMENT || 'sandbox'; // 'sandbox' or 'production'
 const QBO_TOKENS_FILE = path.join(__dirname, '.qbo_tokens.json');
 
