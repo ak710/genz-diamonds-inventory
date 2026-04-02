@@ -1532,3 +1532,79 @@ async function generateLineSheet() {
     button.textContent = 'Generate Line Sheet';
   }
 }
+
+// ── QuickBooks Online Integration ─────────────────────────────────────────────
+
+async function checkQboStatus() {
+  try {
+    const res = await fetch('/api/qbo/status', { headers: getAuthHeaders() });
+    const { connected } = await res.json();
+    document.getElementById('qboConnectBtn').style.display = connected ? 'none' : 'inline-block';
+    document.getElementById('qboSendBtn').style.display = connected ? 'inline-block' : 'none';
+    document.getElementById('qboStatus').textContent = connected ? '✓ QuickBooks connected' : '';
+  } catch (e) {
+    // silently ignore if QBO routes not available
+  }
+}
+
+function connectQuickBooks() {
+  window.open('/api/qbo/connect', '_blank', 'width=600,height=700');
+  // Poll for connection after user completes OAuth
+  const poll = setInterval(async () => {
+    const res = await fetch('/api/qbo/status', { headers: getAuthHeaders() });
+    const { connected } = await res.json();
+    if (connected) {
+      clearInterval(poll);
+      checkQboStatus();
+    }
+  }, 3000);
+}
+
+async function sendToQuickBooks() {
+  if (invoiceItems.length === 0) {
+    alert('No items added to invoice.');
+    return;
+  }
+
+  const customerName = document.getElementById('invoiceCustomerName').value.trim() || 'Customer';
+  const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().slice(0, 10);
+  const invoiceNumber = document.getElementById('invoiceNumber').value.trim() || `INV-${Date.now().toString().slice(-6)}`;
+  const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
+
+  const items = invoiceItems.map(item => {
+    const f = item.fields;
+    const priceRaw = typeof item.priceOverride === 'number'
+      ? item.priceOverride
+      : (f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0);
+    return {
+      design: f['Design'] || 'N/A',
+      purity: f['Purity'] || '',
+      setCts: f['Set Cts.'] || '',
+      price: parseFloat(priceRaw) || 0,
+      qty: item.qty || 1
+    };
+  });
+
+  const btn = document.getElementById('qboSendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('/api/qbo/invoice', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ customerName, invoiceDate, invoiceNumber, gstPercent, items })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Unknown error');
+    alert(`Invoice sent to QuickBooks!\nInvoice #${data.docNumber || data.invoiceId}`);
+  } catch (err) {
+    alert(`Failed to send to QuickBooks: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send to QuickBooks';
+  }
+}
+
+// Check QBO status when invoice tab loads
+document.addEventListener('DOMContentLoaded', checkQboStatus);

@@ -593,6 +593,9 @@
         <div class="inventory-actions">
           <button onclick="clearInvoiceItems()" class="btn-secondary">Clear All</button>
           <button onclick="generateInvoice()" class="btn-primary">Generate Invoice</button>
+          <button id="qboConnectBtn" onclick="connectQuickBooks()" class="btn-secondary" style="display:none">Connect QuickBooks</button>
+          <button id="qboSendBtn" onclick="sendToQuickBooks()" class="btn-primary" style="display:none; background:#2CA01C">Send to QuickBooks</button>
+          <span id="qboStatus" style="font-size:0.85em; color:#666; align-self:center"></span>
         </div>
 
         <div id="invoiceItems" class="scanned-items"></div>

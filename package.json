@@ -13,6 +13,7 @@
     "docx": "^9.5.1",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "intuit-oauth": "^4.2.2",
     "openai": "^6.21.0",
     "pdfkit": "^0.17.2"
   }

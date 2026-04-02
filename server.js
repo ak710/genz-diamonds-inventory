@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const OpenAI = require('openai');
+const OAuthClient = require('intuit-oauth');
 
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
@@ -14,6 +15,95 @@ const airtable = require('./lib/airtableClient');
 const Airtable = require('airtable');
 
 const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || 'genz2026';
+
+// QuickBooks Online config
+const QBO_CLIENT_ID = process.env.INTUIT_CLIENT_ID;
+const QBO_CLIENT_SECRET = process.env.INTUIT_CLIENT_SECRET;
+const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI ||
+  (process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/api/qbo/callback`
+    : 'http://localhost:3000/api/qbo/callback');
+const QBO_ENVIRONMENT = process.env.QBO_ENVIRONMENT || 'sandbox'; // 'sandbox' or 'production'
+const QBO_TOKENS_FILE = path.join(__dirname, '.qbo_tokens.json');
+
+function getQboClient() {
+  return new OAuthClient({
+    clientId: QBO_CLIENT_ID,
+    clientSecret: QBO_CLIENT_SECRET,
+    environment: QBO_ENVIRONMENT,
+    redirectUri: QBO_REDIRECT_URI,
+    logging: false
+  });
+}
+
+function loadQboTokens() {
+  try {
+    if (fs.existsSync(QBO_TOKENS_FILE)) {
+      return JSON.parse(fs.readFileSync(QBO_TOKENS_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return null;
+}
+
+function saveQboTokens(tokenData) {
+  fs.writeFileSync(QBO_TOKENS_FILE, JSON.stringify(tokenData, null, 2));
+}
+
+async function getValidQboToken() {
+  const saved = loadQboTokens();
+  if (!saved || !saved.realmId) throw new Error('QuickBooks not connected. Please connect first.');
+
+  const oauthClient = getQboClient();
+  oauthClient.setToken(saved);
+
+  if (!oauthClient.isAccessTokenValid()) {
+    await oauthClient.refresh();
+    saveQboTokens({ ...oauthClient.getToken(), realmId: saved.realmId });
+  }
+
+  return { accessToken: oauthClient.getToken().access_token, realmId: saved.realmId };
+}
+
+async function getOrCreateCustomer(baseUrl, accessToken, customerName) {
+  const safeName = customerName.replace(/'/g, "\\'");
+  const queryRes = await axios.get(
+    `${baseUrl}/query?query=${encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName = '${safeName}' MAXRESULTS 1`)}`,
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } }
+  );
+  const customers = queryRes.data.QueryResponse.Customer || [];
+  if (customers.length > 0) return customers[0].Id;
+
+  const createRes = await axios.post(
+    `${baseUrl}/customer`,
+    { DisplayName: customerName },
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' } }
+  );
+  return createRes.data.Customer.Id;
+}
+
+async function getOrCreateJewelryItem(baseUrl, accessToken) {
+  const queryRes = await axios.get(
+    `${baseUrl}/query?query=${encodeURIComponent("SELECT * FROM Item WHERE Name = 'Jewelry' MAXRESULTS 1")}`,
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } }
+  );
+  const items = queryRes.data.QueryResponse.Item || [];
+  if (items.length > 0) return items[0].Id;
+
+  // Find an income account to assign to the new item
+  const acctRes = await axios.get(
+    `${baseUrl}/query?query=${encodeURIComponent("SELECT * FROM Account WHERE AccountType = 'Income' MAXRESULTS 1")}`,
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } }
+  );
+  const accounts = acctRes.data.QueryResponse.Account || [];
+  if (accounts.length === 0) throw new Error('No income accounts found in QuickBooks. Please create one first.');
+
+  const createRes = await axios.post(
+    `${baseUrl}/item`,
+    { Name: 'Jewelry', Type: 'Service', IncomeAccountRef: { value: accounts[0].Id } },
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' } }
+  );
+  return createRes.data.Item.Id;
+}
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 const API_KEY = process.env.AIRTABLE_API_KEY;
 const BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -479,6 +569,102 @@ app.post('/api/generate-linesheet', requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── QuickBooks Online Routes ──────────────────────────────────────────────────
+
+// Check connection status
+app.get('/api/qbo/status', requireAuth, (req, res) => {
+  const tokens = loadQboTokens();
+  res.json({ connected: !!(tokens && tokens.realmId) });
+});
+
+// Start OAuth flow - redirect browser to QBO login
+app.get('/api/qbo/connect', requireAuth, (req, res) => {
+  if (!QBO_CLIENT_ID || !QBO_CLIENT_SECRET) {
+    return res.status(500).send('QBO_CLIENT_ID and QBO_CLIENT_SECRET must be set in .env');
+  }
+  const oauthClient = getQboClient();
+  const authUri = oauthClient.authorizeUri({
+    scope: [OAuthClient.scopes.Accounting],
+    state: 'qbo-connect'
+  });
+  res.redirect(authUri);
+});
+
+// OAuth callback - QBO redirects here after user approves
+app.get('/api/qbo/callback', async (req, res) => {
+  try {
+    const oauthClient = getQboClient();
+    const tokenResponse = await oauthClient.createToken(req.url);
+    const realmId = req.query.realmId;
+    saveQboTokens({ ...tokenResponse.getJson(), realmId });
+    res.send('<h2>QuickBooks connected successfully! You can close this tab.</h2>');
+  } catch (err) {
+    console.error('QBO callback error:', err);
+    res.status(500).send('Failed to connect QuickBooks: ' + err.message);
+  }
+});
+
+// Disconnect QBO
+app.post('/api/qbo/disconnect', requireAuth, (req, res) => {
+  if (fs.existsSync(QBO_TOKENS_FILE)) fs.unlinkSync(QBO_TOKENS_FILE);
+  res.json({ success: true });
+});
+
+// Push invoice to QuickBooks
+app.post('/api/qbo/invoice', requireAuth, async (req, res) => {
+  try {
+    const { customerName, invoiceDate, invoiceNumber, gstPercent, items } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items provided' });
+    }
+
+    const { accessToken, realmId } = await getValidQboToken();
+    const baseUrl = QBO_ENVIRONMENT === 'production'
+      ? `https://quickbooks.api.intuit.com/v3/company/${realmId}`
+      : `https://sandbox-quickbooks.api.intuit.com/v3/company/${realmId}`;
+
+    const customerId = await getOrCreateCustomer(baseUrl, accessToken, customerName || 'Customer');
+    const itemId = await getOrCreateJewelryItem(baseUrl, accessToken);
+
+    const lineItems = items.map((item, i) => ({
+      Amount: parseFloat((item.price * item.qty).toFixed(2)),
+      DetailType: 'SalesItemLineDetail',
+      Description: `${item.design}${item.purity ? ' | ' + item.purity : ''}${item.setCts ? ' | ' + item.setCts + ' ct' : ''}`,
+      SalesItemLineDetail: {
+        ItemRef: { value: itemId },
+        Qty: item.qty,
+        UnitPrice: parseFloat(item.price.toFixed(2))
+      }
+    }));
+
+    const invoicePayload = {
+      DocNumber: invoiceNumber || undefined,
+      TxnDate: invoiceDate || new Date().toISOString().slice(0, 10),
+      CustomerRef: { value: customerId },
+      Line: lineItems,
+      TxnTaxDetail: gstPercent > 0 ? undefined : undefined // QBO handles tax via tax codes; omit for simplicity
+    };
+
+    const createRes = await axios.post(
+      `${baseUrl}/invoice`,
+      invoicePayload,
+      { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' } }
+    );
+
+    const created = createRes.data.Invoice;
+    console.log(`✅ QBO invoice created: ${created.Id} for ${customerName}`);
+    res.json({ success: true, invoiceId: created.Id, docNumber: created.DocNumber });
+
+  } catch (err) {
+    console.error('❌ QBO invoice error:', err.response?.data || err.message);
+    const detail = err.response?.data?.Fault?.Error?.[0]?.Message || err.message;
+    res.status(500).json({ error: detail });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
