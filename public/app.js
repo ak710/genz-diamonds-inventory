@@ -2,6 +2,7 @@ let allItems = [];
 let filteredItems = [];
 let scannedItems = [];
 let invoiceItems = [];
+let invoiceAdditionalCharges = [];
 let scanAudio = null;
 let authToken = localStorage.getItem('authToken') || null;
 let customerMode = localStorage.getItem('customerMode') === 'true' || false;
@@ -927,6 +928,13 @@ function setupInvoiceScanning() {
       updateInvoiceStats();
     });
   }
+
+  const discountInput = document.getElementById('invoiceDiscountPercent');
+  if (discountInput) {
+    discountInput.addEventListener('input', () => {
+      updateInvoiceStats();
+    });
+  }
 }
 
 // Process invoice scan
@@ -986,16 +994,24 @@ function updateInvoiceStats() {
   document.getElementById('invoiceItemCount').textContent = totalItems;
 
   const subtotal = invoiceItems.reduce((sum, item) => {
-    const price = typeof item.priceOverride === 'number'
+    const basePrice = typeof item.priceOverride === 'number'
       ? item.priceOverride
       : (item.fields['Tag Price Rounded (CAD)'] || item.fields['Tag Price (CAD)'] || 0);
+    const itemDiscount = item.itemDiscountPercent || 0;
+    const price = basePrice * (1 - itemDiscount / 100);
     const qty = item.qty || 1;
     return sum + (price * qty);
   }, 0);
 
+  const globalDiscountPercent = parseFloat(document.getElementById('invoiceDiscountPercent').value) || 0;
+  const discountAmount = subtotal * (globalDiscountPercent / 100);
+  const discountedSubtotal = subtotal - discountAmount;
+
+  const additionalChargesTotal = invoiceAdditionalCharges.reduce((sum, c) => sum + (parseFloat(c.cost) || 0), 0);
+
   const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
-  const gstAmount = subtotal * (gstPercent / 100);
-  const total = subtotal + gstAmount;
+  const gstAmount = (discountedSubtotal + additionalChargesTotal) * (gstPercent / 100);
+  const total = discountedSubtotal + additionalChargesTotal + gstAmount;
 
   document.getElementById('invoiceSubtotal').textContent = `$${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   document.getElementById('invoiceTotal').textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1031,16 +1047,32 @@ function displayInvoiceItems() {
           <div><strong>${design}</strong></div>
           <div>Job No: ${jobNo} | Purity: ${purity} | Set Cts.: ${setCts}</div>
           <div>Qty: ${qty}</div>
-          <div>
-            <label style="font-size: 0.85em; color: #666;">Price (CAD):</label>
-            <input 
-              type="number" 
-              min="0" 
-              step="0.01" 
-              value="${parseFloat(price).toFixed(2)}" 
-              oninput="updateInvoiceItemPrice(${index}, this.value)"
-              style="margin-left: 0.5em; padding: 0.25em 0.5em; width: 120px;"
-            />
+          <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: center;">
+            <div>
+              <label style="font-size: 0.85em; color: #666;">Price (CAD):</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value="${parseFloat(price).toFixed(2)}"
+                oninput="updateInvoiceItemPrice(${index}, this.value)"
+                style="margin-left: 0.5em; padding: 0.25em 0.5em; width: 120px;"
+              />
+            </div>
+            <div>
+              <label style="font-size: 0.85em; color: #666;">Item Discount:</label>
+              <select onchange="updateInvoiceItemDiscount(${index}, this.value)" style="margin-left: 0.5em; padding: 0.25em 0.5em;">
+                <option value="0" ${(item.itemDiscountPercent || 0) === 0 ? 'selected' : ''}>0%</option>
+                <option value="5" ${(item.itemDiscountPercent || 0) === 5 ? 'selected' : ''}>5%</option>
+                <option value="10" ${(item.itemDiscountPercent || 0) === 10 ? 'selected' : ''}>10%</option>
+                <option value="15" ${(item.itemDiscountPercent || 0) === 15 ? 'selected' : ''}>15%</option>
+                <option value="20" ${(item.itemDiscountPercent || 0) === 20 ? 'selected' : ''}>20%</option>
+                <option value="25" ${(item.itemDiscountPercent || 0) === 25 ? 'selected' : ''}>25%</option>
+                <option value="30" ${(item.itemDiscountPercent || 0) === 30 ? 'selected' : ''}>30%</option>
+                <option value="40" ${(item.itemDiscountPercent || 0) === 40 ? 'selected' : ''}>40%</option>
+                <option value="50" ${(item.itemDiscountPercent || 0) === 50 ? 'selected' : ''}>50%</option>
+              </select>
+            </div>
           </div>
           <div class="scanned-item-time">Added at ${time}</div>
         </div>
@@ -1070,14 +1102,73 @@ function updateInvoiceItemPrice(index, value) {
   updateInvoiceStats();
 }
 
+// Update per-item discount
+function updateInvoiceItemDiscount(index, value) {
+  if (!invoiceItems[index]) return;
+  invoiceItems[index].itemDiscountPercent = parseFloat(value) || 0;
+  updateInvoiceStats();
+}
+
+// Additional charge management
+function addInvoiceCharge() {
+  invoiceAdditionalCharges.push({ name: '', cost: 0 });
+  renderInvoiceCharges();
+  updateInvoiceStats();
+}
+
+function removeInvoiceCharge(index) {
+  invoiceAdditionalCharges.splice(index, 1);
+  renderInvoiceCharges();
+  updateInvoiceStats();
+}
+
+function updateInvoiceChargeField(index, field, value) {
+  if (!invoiceAdditionalCharges[index]) return;
+  if (field === 'cost') {
+    invoiceAdditionalCharges[index].cost = parseFloat(value) || 0;
+    updateInvoiceStats();
+  } else {
+    invoiceAdditionalCharges[index].name = value;
+  }
+}
+
+function renderInvoiceCharges() {
+  const container = document.getElementById('invoiceChargesList');
+  if (!container) return;
+
+  if (invoiceAdditionalCharges.length === 0) {
+    container.innerHTML = '<p style="color: #999; font-size: 0.9em; margin: 0;">No additional charges. Click "+ Add Charge" to add one.</p>';
+    return;
+  }
+
+  let html = '';
+  invoiceAdditionalCharges.forEach((charge, index) => {
+    html += `
+      <div style="display: flex; gap: 0.75em; align-items: center; margin-bottom: 0.5em;">
+        <input type="text" placeholder="Charge name" value="${charge.name}"
+          oninput="updateInvoiceChargeField(${index}, 'name', this.value)"
+          style="flex: 1; padding: 0.4em 0.6em;" />
+        <input type="number" placeholder="0.00" min="0" step="0.01" value="${charge.cost || ''}"
+          oninput="updateInvoiceChargeField(${index}, 'cost', this.value)"
+          style="width: 130px; padding: 0.4em 0.6em;" />
+        <button type="button" onclick="removeInvoiceCharge(${index})"
+          style="padding: 0.4em 0.6em; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">✕</button>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
 // Clear invoice items
 function clearInvoiceItems() {
-  if (invoiceItems.length === 0) return;
-  if (!confirm(`Clear all ${invoiceItems.length} invoice items?`)) return;
+  if (invoiceItems.length === 0 && invoiceAdditionalCharges.length === 0) return;
+  if (!confirm(`Clear all ${invoiceItems.length} invoice item(s) and ${invoiceAdditionalCharges.length} charge(s)?`)) return;
 
   invoiceItems = [];
+  invoiceAdditionalCharges = [];
   updateInvoiceStats();
   displayInvoiceItems();
+  renderInvoiceCharges();
   document.getElementById('invoiceScan').focus();
 }
 
@@ -1093,12 +1184,16 @@ function generateInvoice() {
   const invoiceNumber = document.getElementById('invoiceNumber').value.trim() || `INV-${Date.now().toString().slice(-6)}`;
   const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
 
+  const globalDiscountPercent = parseFloat(document.getElementById('invoiceDiscountPercent').value) || 0;
+
   const html = buildInvoiceHtml({
     items: invoiceItems,
     customerName,
     invoiceDate,
     invoiceNumber,
-    gstPercent
+    gstPercent,
+    globalDiscountPercent,
+    additionalCharges: invoiceAdditionalCharges
   });
 
   const invoiceWindow = window.open('', '_blank');
@@ -1111,26 +1206,31 @@ function generateInvoice() {
   invoiceWindow.document.close();
 }
 
-function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent }) {
+function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent, globalDiscountPercent = 0, additionalCharges = [] }) {
   const lineItems = items.map((item) => {
     const f = item.fields;
     const priceRaw = typeof item.priceOverride === 'number'
       ? item.priceOverride
       : (f['Tag Price Rounded (CAD)'] || f['Tag Price (CAD)'] || 0);
-    const priceNumber = parseFloat(priceRaw) || 0;
+    const basePrice = parseFloat(priceRaw) || 0;
+    const itemDiscount = item.itemDiscountPercent || 0;
+    const effectivePrice = basePrice * (1 - itemDiscount / 100);
     return {
       image: f['Image'] || '',
       design: f['Design'] || 'N/A',
       purity: f['Purity'] || '',
       setCts: f['Set Cts.'] || '',
-      price: priceNumber,
+      price: effectivePrice,
       qty: item.qty || 1
     };
   });
 
   const initialSubtotal = lineItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const initialGst = initialSubtotal * (gstPercent / 100);
-  const initialTotal = initialSubtotal + initialGst;
+  const initialDiscount = initialSubtotal * (globalDiscountPercent / 100);
+  const initialDiscountedSubtotal = initialSubtotal - initialDiscount;
+  const initialChargesTotal = additionalCharges.reduce((sum, c) => sum + (parseFloat(c.cost) || 0), 0);
+  const initialGst = (initialDiscountedSubtotal + initialChargesTotal) * (gstPercent / 100);
+  const initialTotal = initialDiscountedSubtotal + initialChargesTotal + initialGst;
 
   const rows = lineItems.map((item) => {
     return `
@@ -1142,6 +1242,17 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
         <td contenteditable="true" data-role="qty" oninput="recalcTotals()" onblur="recalcTotals()">${item.qty}</td>
         <td contenteditable="true" data-role="price" oninput="recalcTotals()" onblur="recalcTotals()">${item.price.toFixed(2)}</td>
         <td data-role="line-total">${(item.price * item.qty).toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const chargeRows = additionalCharges.map((charge) => {
+    const name = charge.name || 'Additional Charge';
+    const cost = parseFloat(charge.cost) || 0;
+    return `
+      <tr>
+        <td class="label">${name}</td>
+        <td class="value" data-role="charge-value" contenteditable="true" oninput="recalcTotals()" onblur="recalcTotals()">${cost.toFixed(2)}</td>
       </tr>
     `;
   }).join('');
@@ -1160,16 +1271,19 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
     .invoice-title { font-size: 28px; font-weight: bold; margin: 0; }
     .meta { text-align: right; }
     .meta div { margin-bottom: 6px; }
-    .editable { padding: 2px 4px; border-bottom: 1px dashed #999; min-width: 120px; display: inline-block; }
+    .editable { padding: 2px 4px; border-bottom: 1px dashed #999; min-width: 40px; display: inline-block; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background: #f8f9fa; }
     .image-cell img { width: 50px; height: 50px; object-fit: cover; }
     .summary { margin-top: 20px; display: flex; justify-content: flex-end; }
-    .summary table { width: 320px; }
+    .summary table { width: 340px; }
     .summary td { border: none; padding: 6px 8px; }
     .summary .label { text-align: right; color: #666; }
     .summary .value { text-align: right; font-weight: bold; }
+    .summary .discount-label { text-align: right; color: #c0392b; }
+    .summary .discount-value { text-align: right; font-weight: bold; color: #c0392b; }
+    .summary .total-row td { border-top: 2px solid #333; font-size: 1.1em; }
     .actions { margin-top: 20px; display: flex; gap: 10px; }
     .btn { padding: 10px 16px; border: none; cursor: pointer; border-radius: 4px; }
     .btn-primary { background: #28a745; color: white; }
@@ -1192,6 +1306,7 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       <div>Invoice #: <span class="editable" contenteditable="true">${invoiceNumber}</span></div>
       <div>Date: <span class="editable" contenteditable="true">${invoiceDate}</span></div>
       <div>GST %: <span id="gstPercent" class="editable" contenteditable="true" oninput="recalcTotals()" onblur="recalcTotals()">${gstPercent.toFixed(2)}</span></div>
+      <div>Discount %: <span id="discountPercent" class="editable" contenteditable="true" oninput="recalcTotals()" onblur="recalcTotals()">${globalDiscountPercent.toFixed(2)}</span></div>
     </div>
   </div>
 
@@ -1216,15 +1331,20 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
     <table>
       <tr>
         <td class="label">Subtotal</td>
-        <td class="value" id="subtotalValue" data-role="summary-subtotal">${initialSubtotal.toFixed(2)}</td>
+        <td class="value" data-role="summary-subtotal">${initialSubtotal.toFixed(2)}</td>
       </tr>
-      <tr>
-        <td class="label">GST</td>
-        <td class="value" id="gstValue" data-role="summary-gst">${initialGst.toFixed(2)}</td>
+      <tr id="discountRow" style="${globalDiscountPercent > 0 ? '' : 'display:none'}">
+        <td class="discount-label">Discount (<span data-role="discount-pct-display">${globalDiscountPercent.toFixed(2)}</span>%)</td>
+        <td class="discount-value" data-role="summary-discount">-${initialDiscount.toFixed(2)}</td>
       </tr>
+      ${chargeRows}
       <tr>
-        <td class="label">Total</td>
-        <td class="value" id="totalValue" data-role="summary-total">${initialTotal.toFixed(2)}</td>
+        <td class="label">GST (<span data-role="gst-pct-display">${gstPercent.toFixed(2)}</span>%)</td>
+        <td class="value" data-role="summary-gst">${initialGst.toFixed(2)}</td>
+      </tr>
+      <tr class="total-row">
+        <td class="label"><strong>Total</strong></td>
+        <td class="value" data-role="summary-total">${initialTotal.toFixed(2)}</td>
       </tr>
     </table>
   </div>
@@ -1237,7 +1357,7 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
   <script>
     function parseNumber(value) {
       if (!value) return 0;
-      return parseFloat(String(value).replace(/[^0-9.]/g, '')) || 0;
+      return parseFloat(String(value).replace(/[^0-9.\\-]/g, '')) || 0;
     }
 
     function recalcTotals() {
@@ -1248,6 +1368,7 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
         const qtyEl = row.querySelector('[data-role="qty"]');
         const priceEl = row.querySelector('[data-role="price"]');
         const totalEl = row.querySelector('[data-role="line-total"]');
+        if (!qtyEl || !priceEl || !totalEl) return;
 
         const qty = parseNumber(qtyEl.textContent);
         const price = parseNumber(priceEl.textContent);
@@ -1256,10 +1377,33 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
         subtotal += lineTotal;
       });
 
-      const gstPercent = parseNumber(document.getElementById('gstPercent').textContent);
-      const gst = subtotal * (gstPercent / 100);
-      const total = subtotal + gst;
+      const discountPct = parseNumber(document.getElementById('discountPercent').textContent);
+      const discount = subtotal * (discountPct / 100);
+      const discountedSubtotal = subtotal - discount;
 
+      const discountRow = document.getElementById('discountRow');
+      if (discountRow) {
+        discountRow.style.display = discountPct > 0 ? '' : 'none';
+      }
+      document.querySelectorAll('[data-role="discount-pct-display"]').forEach(el => {
+        el.textContent = discountPct.toFixed(2);
+      });
+      document.querySelectorAll('[data-role="summary-discount"]').forEach(el => {
+        el.textContent = '-' + discount.toFixed(2);
+      });
+
+      let chargesTotal = 0;
+      document.querySelectorAll('[data-role="charge-value"]').forEach(el => {
+        chargesTotal += parseNumber(el.textContent);
+      });
+
+      const gstPct = parseNumber(document.getElementById('gstPercent').textContent);
+      const gst = (discountedSubtotal + chargesTotal) * (gstPct / 100);
+      const total = discountedSubtotal + chargesTotal + gst;
+
+      document.querySelectorAll('[data-role="gst-pct-display"]').forEach(el => {
+        el.textContent = gstPct.toFixed(2);
+      });
       document.querySelectorAll('[data-role="summary-subtotal"]').forEach(el => {
         el.textContent = subtotal.toFixed(2);
       });

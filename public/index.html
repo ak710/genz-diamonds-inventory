@@ -581,7 +581,19 @@
               <label>GST %</label>
               <input type="number" id="invoiceGstPercent" min="0" max="100" step="0.01" value="5">
             </div>
+            <div class="filter-group">
+              <label>Discount %</label>
+              <input type="number" id="invoiceDiscountPercent" min="0" max="100" step="0.01" value="0" placeholder="0">
+            </div>
           </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 1.5em; border-radius: 8px; margin-bottom: 2em; border: 1px solid #dee2e6;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75em;">
+            <h3 style="margin: 0; font-size: 1.1em;">Additional Charges</h3>
+            <button type="button" onclick="addInvoiceCharge()" class="btn-secondary" style="padding: 0.4em 0.8em; font-size: 0.9em;">+ Add Charge</button>
+          </div>
+          <div id="invoiceChargesList"><p style="color: #999; font-size: 0.9em; margin: 0;">No additional charges. Click "+ Add Charge" to add one.</p></div>
         </div>
 
         <form id="invoiceForm">
