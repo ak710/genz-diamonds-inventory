@@ -608,9 +608,9 @@ function renderRecord(record, combinedItems = null) {
   
   // Only show these fields in staff mode (not customer mode)
   if (!customerMode) {
-    html += '<tr><td><b>Tag Price (USD)</b></td><td>' + (f['Tag Price (USD)'] || '') + '</td></tr>';
-    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price (CAD)'] || '') + '</td></tr>';
-    html += '<tr><td><b>Tag Price Rounded (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price (USD)</b></td><td>' + (f['Tag Price (USD)'] != null ? '$' + parseFloat(f['Tag Price (USD)']).toFixed(2) : '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price (CAD)'] != null ? '$' + parseFloat(f['Tag Price (CAD)']).toFixed(2) : '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price Rounded (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] != null ? '$' + parseFloat(f['Tag Price Rounded (CAD)']).toFixed(2) : '') + '</td></tr>';
     const _tagPrice10 = f['Tag Price Rounded (CAD)']; html += '<tr><td><b>10% Discount</b></td><td>' + (_tagPrice10 ? '$' + (_tagPrice10 * 0.9).toFixed(2) : '') + '</td></tr>';
     html += '<tr><td><b>15% Discount</b></td><td>' + (f['15% Discount Price (CAD)'] != null ? '$' + parseFloat(f['15% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
     html += '<tr><td><b>20% Discount</b></td><td>' + (f['20% Discount Price (CAD)'] != null ? '$' + parseFloat(f['20% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
@@ -620,7 +620,7 @@ function renderRecord(record, combinedItems = null) {
     html += '<tr><td><b>LGD Cts</b></td><td>' + (f['LGD Cts'] || '') + '</td></tr>';
   } else {
     // Customer mode - show only Tag Price Rounded (CAD) renamed
-    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] != null ? '$' + parseFloat(f['Tag Price Rounded (CAD)']).toFixed(2) : '') + '</td></tr>';
     const _tagPrice10c = f['Tag Price Rounded (CAD)']; html += '<tr><td><b>10% Discount</b></td><td>' + (_tagPrice10c ? '$' + (_tagPrice10c * 0.9).toFixed(2) : '') + '</td></tr>';
   }
   
