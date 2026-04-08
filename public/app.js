@@ -1180,6 +1180,7 @@ function generateInvoice() {
   }
 
   const customerName = document.getElementById('invoiceCustomerName').value.trim() || 'Customer';
+  const customerPhone = document.getElementById('invoiceCustomerPhone').value.trim();
   const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().slice(0, 10);
   const invoiceNumber = document.getElementById('invoiceNumber').value.trim() || `INV-${Date.now().toString().slice(-6)}`;
   const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
@@ -1189,6 +1190,7 @@ function generateInvoice() {
   const html = buildInvoiceHtml({
     items: invoiceItems,
     customerName,
+    customerPhone,
     invoiceDate,
     invoiceNumber,
     gstPercent,
@@ -1206,7 +1208,7 @@ function generateInvoice() {
   invoiceWindow.document.close();
 }
 
-function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gstPercent, globalDiscountPercent = 0, additionalCharges = [] }) {
+function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate, invoiceNumber, gstPercent, globalDiscountPercent = 0, additionalCharges = [] }) {
   const lineItems = items.map((item) => {
     const f = item.fields;
     const priceRaw = typeof item.priceOverride === 'number'
@@ -1300,6 +1302,7 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
       <img src="/assets/logo.png" alt="Company Logo" class="invoice-logo" onerror="this.style.display='none'" />
       <div class="invoice-title">Invoice</div>
       <div>Customer: <span class="editable" contenteditable="true">${customerName}</span></div>
+      <div>Phone: <span class="editable" contenteditable="true">${customerPhone}</span></div>
       <div>Notes: <span class="editable" contenteditable="true">Thank you for your business.</span></div>
     </div>
     <div class="meta">
@@ -1352,6 +1355,12 @@ function buildInvoiceHtml({ items, customerName, invoiceDate, invoiceNumber, gst
   <div class="actions">
     <button class="btn btn-secondary" onclick="window.print()">Save as PDF</button>
     <button class="btn btn-primary" onclick="window.close()">Close</button>
+  </div>
+
+  <div style="margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 0.85em; line-height: 1.7;">
+    <strong style="color: #333;">GEN Z DIAMONDS COMPANY LIMITED</strong><br>
+    25 Sagebrook Rd, Brampton, ON L6P 2Y5<br>
+    +1 647 825 2510
   </div>
 
   <script>
