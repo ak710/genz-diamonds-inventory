@@ -1220,6 +1220,7 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate
     return {
       image: f['Image'] || '',
       design: f['Design'] || 'N/A',
+      jobNo: f['Job No.'] || '',
       purity: f['Purity'] || '',
       setCts: f['Set Cts.'] || '',
       price: effectivePrice,
@@ -1239,6 +1240,7 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate
       <tr>
         <td class="image-cell"><img src="${item.image}" alt="${item.design}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect fill=%22%23f0f0f0%22 width=%2250%22 height=%2250%22/%3E%3C/svg%3E'" /></td>
         <td>${item.design}</td>
+        <td>${item.jobNo}</td>
         <td>${item.purity}</td>
         <td>${item.setCts}</td>
         <td contenteditable="true" data-role="qty" oninput="recalcTotals()" onblur="recalcTotals()">${item.qty}</td>
@@ -1319,6 +1321,7 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate
       <tr>
         <th>Image</th>
         <th>Design No</th>
+        <th>Job No</th>
         <th>Purity</th>
         <th>Set Cts</th>
         <th>Qty</th>
