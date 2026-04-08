@@ -1290,9 +1290,10 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate
     .btn { padding: 10px 16px; border: none; cursor: pointer; border-radius: 4px; }
     .btn-primary { background: #28a745; color: white; }
     .btn-secondary { background: #6c757d; color: white; }
+    @page { margin: 0; }
     @media print {
       .actions { display: none; }
-      body { padding: 0; }
+      body { padding: 1.5cm; }
     }
   </style>
 </head>
