@@ -541,6 +541,23 @@ document.getElementById('searchForm').addEventListener('submit', async function(
     const data = await res.json();
     if (data && data.record) {
       resultDiv.innerHTML = renderRecord(data.record);
+
+      const design = data.record.fields['Design'];
+      if (design) {
+        fetch(`/api/design-stock/${encodeURIComponent(design)}`, { headers: getAuthHeaders() })
+          .then(r => r.json())
+          .then(stock => {
+            const el = document.getElementById('designStockCount');
+            if (el) el.textContent = `${stock.remaining} / ${stock.total}`;
+          })
+          .catch(() => {
+            const el = document.getElementById('designStockCount');
+            if (el) el.textContent = 'N/A';
+          });
+      } else {
+        const el = document.getElementById('designStockCount');
+        if (el) el.textContent = 'N/A';
+      }
     } else {
       resultDiv.innerHTML = 'No record found.';
     }
@@ -552,6 +569,7 @@ document.getElementById('searchForm').addEventListener('submit', async function(
 function renderRecord(record, combinedItems = null) {
   const f = record.fields;
   let html = '<h2>Piece Details</h2>';
+  html += '<p style="margin: 0 0 1em; color: #666; font-size: 0.9em;">Qty Remaining / Total: <strong id="designStockCount">Loading...</strong></p>';
   
   // Add tabs for combined items at the top
   if (combinedItems && combinedItems.length > 1) {
