@@ -525,7 +525,13 @@ function showItemDetail(recordId) {
 // Search form handler (existing functionality)
 document.getElementById('searchForm').addEventListener('submit', async function(e) {
   e.preventDefault();
-  const barcode = document.getElementById('barcode').value.trim();
+  const input = document.getElementById('barcode');
+  const barcode = input.value.trim();
+  if (!barcode) return;
+
+  input.value = '';
+  input.focus();
+
   const resultDiv = document.getElementById('result');
   resultDiv.innerHTML = 'Searching...';
   const res = await fetch(`/api/search/${encodeURIComponent(barcode)}`, {
