@@ -612,10 +612,10 @@ function renderRecord(record, combinedItems = null) {
     html += '<tr><td><b>Tag Price (CAD)</b></td><td>' + (f['Tag Price (CAD)'] || '') + '</td></tr>';
     html += '<tr><td><b>Tag Price Rounded (CAD)</b></td><td>' + (f['Tag Price Rounded (CAD)'] || '') + '</td></tr>';
     const _tagPrice10 = f['Tag Price Rounded (CAD)']; html += '<tr><td><b>10% Discount</b></td><td>' + (_tagPrice10 ? '$' + (_tagPrice10 * 0.9).toFixed(2) : '') + '</td></tr>';
-    html += '<tr><td><b>15% Discount</b></td><td>' + (f['15% Discount Price (CAD)'] || '') + '</td></tr>';
-    html += '<tr><td><b>20% Discount</b></td><td>' + (f['20% Discount Price (CAD)'] || '') + '</td></tr>';
-    html += '<tr><td><b>25% Discount</b></td><td>' + (f['25% Discount Price (CAD)'] || '') + '</td></tr>';
-    html += '<tr><td><b>33% Discount</b></td><td>' + (f['33% Discount Price (CAD)'] || '') + '</td></tr>';
+    html += '<tr><td><b>15% Discount</b></td><td>' + (f['15% Discount Price (CAD)'] != null ? '$' + parseFloat(f['15% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
+    html += '<tr><td><b>20% Discount</b></td><td>' + (f['20% Discount Price (CAD)'] != null ? '$' + parseFloat(f['20% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
+    html += '<tr><td><b>25% Discount</b></td><td>' + (f['25% Discount Price (CAD)'] != null ? '$' + parseFloat(f['25% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
+    html += '<tr><td><b>33% Discount</b></td><td>' + (f['33% Discount Price (CAD)'] != null ? '$' + parseFloat(f['33% Discount Price (CAD)']).toFixed(2) : '') + '</td></tr>';
     html += '<tr><td><b>DIA Cts</b></td><td>' + (f['DIA Cts'] || '') + '</td></tr>';
     html += '<tr><td><b>LGD Cts</b></td><td>' + (f['LGD Cts'] || '') + '</td></tr>';
   } else {
