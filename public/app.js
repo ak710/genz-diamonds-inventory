@@ -94,56 +94,100 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// AI Search functions
+// Natural Language Search functions
 let isAISearchActive = false;
 
-async function performAISearch() {
+function performAISearch() {
   const query = document.getElementById('aiSearchInput').value.trim();
   const statusEl = document.getElementById('aiSearchStatus');
-  
+
   if (!query) {
     statusEl.textContent = '⚠️ Please enter a search query';
     statusEl.style.color = '#856404';
     return;
   }
-  
-  statusEl.textContent = '🔍 Searching...';
-  statusEl.style.color = '#6c757d';
-  
-  try {
-    const response = await fetch('/api/ai-search', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ query })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Search failed');
-    }
-    
-    // Mark that AI search is active
-    isAISearchActive = true;
-    
-    // Display results
-    filteredItems = data.results || [];
-    
-    if (filteredItems.length === 0) {
-      statusEl.textContent = '❌ No items found for your search';
-      statusEl.style.color = '#856404';
-    } else {
-      statusEl.textContent = `✅ Found ${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`;
-      statusEl.style.color = '#28a745';
-    }
-    
-    displayItems(filteredItems);
-    
-  } catch (err) {
-    console.error('AI Search error:', err);
-    statusEl.textContent = `❌ Error: ${err.message}`;
-    statusEl.style.color = '#dc3545';
+
+  if (allItems.length === 0) {
+    statusEl.textContent = '⚠️ Please load the browse tab first';
+    statusEl.style.color = '#856404';
+    return;
   }
+
+  const q = query.toLowerCase();
+
+  // --- product type ---
+  const typeMap = { ring: 'rn', rings: 'rn', earring: 'er', earrings: 'er', necklace: 'nt', necklaces: 'nt', pendant: 'nt', pendants: 'nt', bracelet: 'br', bracelets: 'br' };
+  let typeCode = null;
+  for (const [word, code] of Object.entries(typeMap)) {
+    if (q.includes(word)) { typeCode = code; break; }
+  }
+
+  // --- purity ---
+  const purityMatch = q.match(/\b(10k|14k|18k|10 k|14 k|18 k)\b/);
+  const purityFilter = purityMatch ? purityMatch[1].replace(' ', '').toUpperCase() : null;
+
+  // --- metal colour ---
+  let metalFilter = null;
+  if (q.includes('rose gold')) metalFilter = 'rose';
+  else if (q.includes('white gold')) metalFilter = 'white';
+  else if (q.includes('yellow gold')) metalFilter = 'yellow';
+
+  // --- carat range ---
+  let ctsMin = null, ctsMax = null;
+  const overMatch = q.match(/over\s+([\d.]+)\s*carat/);
+  const underMatch = q.match(/under\s+([\d.]+)\s*carat/);
+  const betweenMatch = q.match(/between\s+([\d.]+)\s*and\s+([\d.]+)\s*carat/);
+  const aboveMatch = q.match(/([\d.]+)\+\s*carat/);
+  if (betweenMatch) { ctsMin = parseFloat(betweenMatch[1]); ctsMax = parseFloat(betweenMatch[2]); }
+  else if (overMatch) ctsMin = parseFloat(overMatch[1]);
+  else if (underMatch) ctsMax = parseFloat(underMatch[1]);
+  else if (aboveMatch) ctsMin = parseFloat(aboveMatch[1]);
+
+  // --- availability ---
+  const wantSold = q.includes('sold');
+  const wantAvailable = q.includes('available') || q.includes('in stock') || q.includes('unsold');
+
+  // --- remaining keywords to match against description/design ---
+  const stopWords = new Set([
+    'rings','ring','earrings','earring','necklaces','necklace','pendants','pendant','bracelets','bracelet',
+    'white','yellow','rose','gold','over','under','between','and','carat','carats','cts',
+    'available','in','stock','sold','unsold','show','me','find','search','with','for','a','the','of',
+    '10k','14k','18k'
+  ]);
+  const keywords = q.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+
+  isAISearchActive = true;
+
+  filteredItems = allItems.filter(record => {
+    const f = record.fields;
+    const design = (f['Design'] || '').toLowerCase();
+    const desc = (f['AI Description'] || '').toLowerCase();
+    const purity = (f['Purity'] || '').toLowerCase();
+    const setCts = parseFloat(f['Set Cts.']) || 0;
+    const isSold = f['Sold'] === true;
+
+    if (typeCode && !design.includes(typeCode)) return false;
+    if (purityFilter && !purity.startsWith(purityFilter.toLowerCase())) return false;
+    if (metalFilter && !desc.includes(metalFilter)) return false;
+    if (ctsMin !== null && setCts < ctsMin) return false;
+    if (ctsMax !== null && setCts > ctsMax) return false;
+    if (wantSold && !isSold) return false;
+    if (wantAvailable && isSold) return false;
+    for (const kw of keywords) {
+      if (!desc.includes(kw) && !design.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  if (filteredItems.length === 0) {
+    statusEl.textContent = '❌ No items found';
+    statusEl.style.color = '#856404';
+  } else {
+    statusEl.textContent = `✅ Found ${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`;
+    statusEl.style.color = '#28a745';
+  }
+
+  displayItems(filteredItems);
 }
 
 function clearAISearch() {
