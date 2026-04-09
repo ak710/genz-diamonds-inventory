@@ -587,33 +587,7 @@ document.getElementById('searchForm').addEventListener('submit', async function(
       resultDiv.innerHTML = renderRecord(data.record);
 
       const design = data.record.fields['Design'];
-      const stockEl = document.getElementById('designStockCount');
-      if (design) {
-        const calcFromAllItems = () => {
-          const matches = allItems.filter(r => r.fields['Design'] === design);
-          const total = matches.length;
-          const remaining = matches.filter(r => !r.fields['Sold']).length;
-          if (stockEl) stockEl.textContent = `${remaining} / ${total}`;
-        };
-        if (allItems.length > 0) {
-          calcFromAllItems();
-        } else {
-          // allItems is still loading — poll for up to 5s then give up
-          let waited = 0;
-          const poll = setInterval(() => {
-            waited += 200;
-            if (allItems.length > 0) {
-              clearInterval(poll);
-              calcFromAllItems();
-            } else if (waited >= 5000) {
-              clearInterval(poll);
-              if (stockEl) stockEl.textContent = 'N/A';
-            }
-          }, 200);
-        }
-      } else {
-        if (stockEl) stockEl.textContent = 'N/A';
-      }
+      updateDesignStockCount(design);
     } else {
       resultDiv.innerHTML = 'No record found.';
     }
@@ -621,6 +595,31 @@ document.getElementById('searchForm').addEventListener('submit', async function(
     resultDiv.innerHTML = 'Error searching for record.';
   }
 });
+
+async function updateDesignStockCount(design) {
+  // Wait for allItems to be populated (prefetch or browse tab load)
+  if (allItems.length === 0) {
+    await new Promise(resolve => {
+      const poll = setInterval(() => {
+        if (allItems.length > 0) { clearInterval(poll); resolve(); }
+      }, 100);
+      setTimeout(() => { clearInterval(poll); resolve(); }, 8000);
+    });
+  }
+
+  const el = document.getElementById('designStockCount');
+  if (!el) return;
+
+  if (!design || allItems.length === 0) {
+    el.textContent = 'N/A';
+    return;
+  }
+
+  const matches = allItems.filter(r => r.fields['Design'] === design);
+  const total = matches.length;
+  const remaining = matches.filter(r => !r.fields['Sold']).length;
+  el.textContent = `${remaining} / ${total}`;
+}
 
 function renderRecord(record, combinedItems = null) {
   const f = record.fields;
