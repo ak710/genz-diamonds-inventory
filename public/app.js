@@ -589,22 +589,27 @@ document.getElementById('searchForm').addEventListener('submit', async function(
       const design = data.record.fields['Design'];
       const stockEl = document.getElementById('designStockCount');
       if (design) {
-        // Fast path: calculate from already-loaded allItems
-        if (allItems.length > 0) {
+        const calcFromAllItems = () => {
           const matches = allItems.filter(r => r.fields['Design'] === design);
           const total = matches.length;
           const remaining = matches.filter(r => !r.fields['Sold']).length;
           if (stockEl) stockEl.textContent = `${remaining} / ${total}`;
+        };
+        if (allItems.length > 0) {
+          calcFromAllItems();
         } else {
-          // Fallback: server query
-          fetch(`/api/design-stock/${encodeURIComponent(design)}`, { headers: getAuthHeaders() })
-            .then(r => r.json())
-            .then(stock => {
-              if (stockEl) stockEl.textContent = `${stock.remaining} / ${stock.total}`;
-            })
-            .catch(() => {
+          // allItems is still loading — poll for up to 5s then give up
+          let waited = 0;
+          const poll = setInterval(() => {
+            waited += 200;
+            if (allItems.length > 0) {
+              clearInterval(poll);
+              calcFromAllItems();
+            } else if (waited >= 5000) {
+              clearInterval(poll);
               if (stockEl) stockEl.textContent = 'N/A';
-            });
+            }
+          }, 200);
         }
       } else {
         if (stockEl) stockEl.textContent = 'N/A';
@@ -785,9 +790,23 @@ function attachEditHandler(recordId, combinedItems) {
   });
 }
 
+// Silently pre-load allItems in the background so barcode search stock counts are instant
+async function prefetchAllItems() {
+  if (allItems.length > 0) return;
+  try {
+    const res = await fetch('/api/items', { headers: getAuthHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (allItems.length === 0) { // don't overwrite if browse tab loaded first
+      allItems = data.records || [];
+      filteredItems = [...allItems];
+    }
+  } catch (e) { /* silent */ }
+}
+
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
-  loadAllItems();
+  prefetchAllItems();
   initAudio();
   setupInventoryScanning();
   setupInvoiceScanning();
