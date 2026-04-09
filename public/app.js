@@ -583,8 +583,6 @@ document.getElementById('searchForm').addEventListener('submit', async function(
     if (data && data.record) {
       resultDiv.innerHTML = renderRecord(data.record);
 
-      const design = data.record.fields['Design'];
-      updateDesignStockCount(design);
     } else {
       resultDiv.innerHTML = 'No record found.';
     }
@@ -593,38 +591,10 @@ document.getElementById('searchForm').addEventListener('submit', async function(
   }
 });
 
-function updateDesignStockCount(design) {
-  const el = document.getElementById('designStockCount');
-  if (!el) return;
-  if (!design) { el.textContent = 'N/A'; return; }
-
-  if (allItems.length > 0) {
-    const matches = allItems.filter(r => r.fields['Design'] === design);
-    el.textContent = `${matches.filter(r => !r.fields['Sold']).length} / ${matches.length}`;
-  } else {
-    // allItems still loading — poll until ready
-    const poll = setInterval(() => {
-      if (allItems.length > 0) {
-        clearInterval(poll);
-        const freshEl = document.getElementById('designStockCount');
-        if (!freshEl) return;
-        const matches = allItems.filter(r => r.fields['Design'] === design);
-        freshEl.textContent = `${matches.filter(r => !r.fields['Sold']).length} / ${matches.length}`;
-      }
-    }, 100);
-    // Give up after 10s
-    setTimeout(() => {
-      clearInterval(poll);
-      const freshEl = document.getElementById('designStockCount');
-      if (freshEl && freshEl.textContent === 'Loading...') freshEl.textContent = 'N/A';
-    }, 10000);
-  }
-}
 
 function renderRecord(record, combinedItems = null) {
   const f = record.fields;
   let html = '<h2>Piece Details</h2>';
-  html += '<p style="margin: 0 0 1em; color: #666; font-size: 0.9em;">Qty Remaining / Total: <strong id="designStockCount">Loading...</strong></p>';
   
   // Add tabs for combined items at the top
   if (combinedItems && combinedItems.length > 1) {

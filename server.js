@@ -192,20 +192,6 @@ app.get('/api/search/:jobNo', requireAuth, async (req, res) => {
   }
 });
 
-// Get stock count for a design (remaining / total)
-app.get('/api/design-stock/:design', requireAuth, async (req, res) => {
-  try {
-    const design = req.params.design;
-    const records = await airtable.findByDesign(design);
-    const total = records.length;
-    const remaining = records.filter(r => !r.fields['Sold']).length;
-    res.json({ remaining, total });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Update a record by record ID
 app.post('/api/update/:recordId', requireAuth, async (req, res) => {
   try {
