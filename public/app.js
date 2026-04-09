@@ -543,20 +543,27 @@ document.getElementById('searchForm').addEventListener('submit', async function(
       resultDiv.innerHTML = renderRecord(data.record);
 
       const design = data.record.fields['Design'];
+      const stockEl = document.getElementById('designStockCount');
       if (design) {
-        fetch(`/api/design-stock/${encodeURIComponent(design)}`, { headers: getAuthHeaders() })
-          .then(r => r.json())
-          .then(stock => {
-            const el = document.getElementById('designStockCount');
-            if (el) el.textContent = `${stock.remaining} / ${stock.total}`;
-          })
-          .catch(() => {
-            const el = document.getElementById('designStockCount');
-            if (el) el.textContent = 'N/A';
-          });
+        // Fast path: calculate from already-loaded allItems
+        if (allItems.length > 0) {
+          const matches = allItems.filter(r => r.fields['Design'] === design);
+          const total = matches.length;
+          const remaining = matches.filter(r => !r.fields['Sold']).length;
+          if (stockEl) stockEl.textContent = `${remaining} / ${total}`;
+        } else {
+          // Fallback: server query
+          fetch(`/api/design-stock/${encodeURIComponent(design)}`, { headers: getAuthHeaders() })
+            .then(r => r.json())
+            .then(stock => {
+              if (stockEl) stockEl.textContent = `${stock.remaining} / ${stock.total}`;
+            })
+            .catch(() => {
+              if (stockEl) stockEl.textContent = 'N/A';
+            });
+        }
       } else {
-        const el = document.getElementById('designStockCount');
-        if (el) el.textContent = 'N/A';
+        if (stockEl) stockEl.textContent = 'N/A';
       }
     } else {
       resultDiv.innerHTML = 'No record found.';
