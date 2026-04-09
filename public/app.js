@@ -247,7 +247,7 @@ function switchTab(tab) {
   if (tab === 'browse') {
     document.querySelector('.tab:nth-child(1)').classList.add('active');
     document.getElementById('browseTab').classList.add('active');
-    if (allItems.length === 0) loadAllItems();
+    loadAllItems();
   } else if (tab === 'search') {
     document.querySelector('.tab:nth-child(2)').classList.add('active');
     document.getElementById('searchTab').classList.add('active');
