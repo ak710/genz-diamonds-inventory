@@ -1207,6 +1207,7 @@ function generateInvoice() {
 
   const customerName = document.getElementById('invoiceCustomerName').value.trim() || 'Customer';
   const customerPhone = document.getElementById('invoiceCustomerPhone').value.trim();
+  const customerEmail = document.getElementById('invoiceCustomerEmail').value.trim();
   const invoiceDate = document.getElementById('invoiceDate').value || new Date().toISOString().slice(0, 10);
   const invoiceNumber = document.getElementById('invoiceNumber').value.trim() || `INV-${Date.now().toString().slice(-6)}`;
   const gstPercent = parseFloat(document.getElementById('invoiceGstPercent').value) || 0;
@@ -1217,6 +1218,7 @@ function generateInvoice() {
     items: invoiceItems,
     customerName,
     customerPhone,
+    customerEmail,
     invoiceDate,
     invoiceNumber,
     gstPercent,
@@ -1234,7 +1236,7 @@ function generateInvoice() {
   invoiceWindow.document.close();
 }
 
-function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate, invoiceNumber, gstPercent, globalDiscountPercent = 0, additionalCharges = [] }) {
+function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEmail = '', invoiceDate, invoiceNumber, gstPercent, globalDiscountPercent = 0, additionalCharges = [] }) {
   const lineItems = items.map((item) => {
     const f = item.fields;
     const priceRaw = typeof item.priceOverride === 'number'
@@ -1332,6 +1334,7 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', invoiceDate
       <div class="invoice-title">Invoice</div>
       <div>Customer: <span class="editable" contenteditable="true">${customerName}</span></div>
       <div>Phone: <span class="editable" contenteditable="true">${customerPhone}</span></div>
+      <div>Email: <span class="editable" contenteditable="true">${customerEmail}</span></div>
       <div>Notes: <span class="editable" contenteditable="true">Thank you for your business.</span></div>
     </div>
     <div class="meta">
