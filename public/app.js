@@ -247,7 +247,7 @@ function switchTab(tab) {
   if (tab === 'browse') {
     document.querySelector('.tab:nth-child(1)').classList.add('active');
     document.getElementById('browseTab').classList.add('active');
-    loadAllItems();
+    if (allItems.length === 0) loadAllItems(); else displayItems(filteredItems);
   } else if (tab === 'search') {
     document.querySelector('.tab:nth-child(2)').classList.add('active');
     document.getElementById('searchTab').classList.add('active');
@@ -402,11 +402,8 @@ function displayItems(items) {
       const isSold = f['Sold'] === true;
       
       if (combineMode && item._combinedItems) {
-        // For combined items, count stock
         totalPieces += item._combinedItems.length;
-        if (!isSold) {
-          piecesInStock += item._combinedItems.length;
-        }
+        piecesInStock += item._combinedItems.filter(i => !i.fields['Sold']).length;
         uniqueDesigns.add(f['Design']);
       } else {
         // For regular items, count 1 per item
@@ -596,29 +593,32 @@ document.getElementById('searchForm').addEventListener('submit', async function(
   }
 });
 
-async function updateDesignStockCount(design) {
-  // Wait for allItems to be populated (prefetch or browse tab load)
-  if (allItems.length === 0) {
-    await new Promise(resolve => {
-      const poll = setInterval(() => {
-        if (allItems.length > 0) { clearInterval(poll); resolve(); }
-      }, 100);
-      setTimeout(() => { clearInterval(poll); resolve(); }, 8000);
-    });
-  }
-
+function updateDesignStockCount(design) {
   const el = document.getElementById('designStockCount');
   if (!el) return;
+  if (!design) { el.textContent = 'N/A'; return; }
 
-  if (!design || allItems.length === 0) {
-    el.textContent = 'N/A';
-    return;
+  if (allItems.length > 0) {
+    const matches = allItems.filter(r => r.fields['Design'] === design);
+    el.textContent = `${matches.filter(r => !r.fields['Sold']).length} / ${matches.length}`;
+  } else {
+    // allItems still loading — poll until ready
+    const poll = setInterval(() => {
+      if (allItems.length > 0) {
+        clearInterval(poll);
+        const freshEl = document.getElementById('designStockCount');
+        if (!freshEl) return;
+        const matches = allItems.filter(r => r.fields['Design'] === design);
+        freshEl.textContent = `${matches.filter(r => !r.fields['Sold']).length} / ${matches.length}`;
+      }
+    }, 100);
+    // Give up after 10s
+    setTimeout(() => {
+      clearInterval(poll);
+      const freshEl = document.getElementById('designStockCount');
+      if (freshEl && freshEl.textContent === 'Loading...') freshEl.textContent = 'N/A';
+    }, 10000);
   }
-
-  const matches = allItems.filter(r => r.fields['Design'] === design);
-  const total = matches.length;
-  const remaining = matches.filter(r => !r.fields['Sold']).length;
-  el.textContent = `${remaining} / ${total}`;
 }
 
 function renderRecord(record, combinedItems = null) {
@@ -789,23 +789,9 @@ function attachEditHandler(recordId, combinedItems) {
   });
 }
 
-// Silently pre-load allItems in the background so barcode search stock counts are instant
-async function prefetchAllItems() {
-  if (allItems.length > 0) return;
-  try {
-    const res = await fetch('/api/items', { headers: getAuthHeaders() });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (allItems.length === 0) { // don't overwrite if browse tab loaded first
-      allItems = data.records || [];
-      filteredItems = [...allItems];
-    }
-  } catch (e) { /* silent */ }
-}
-
 // Initialize on load
 window.addEventListener('DOMContentLoaded', () => {
-  prefetchAllItems();
+  loadAllItems();
   initAudio();
   setupInventoryScanning();
   setupInvoiceScanning();
