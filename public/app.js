@@ -1245,12 +1245,14 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
     const basePrice = parseFloat(priceRaw) || 0;
     const itemDiscount = item.itemDiscountPercent || 0;
     const effectivePrice = basePrice * (1 - itemDiscount / 100);
+    const purityRaw = f['Purity'] || '';
     return {
       image: f['Image'] || '',
       design: f['Design'] || 'N/A',
       jobNo: f['Job No.'] || '',
-      purity: f['Purity'] || '',
-      setCts: f['Set Cts.'] || '',
+      purity: purityRaw.split(' ')[0],
+      setCts: f['Set Cts.'] ? f['Set Cts.'] + ' cts' : '',
+      grossWeight: f['Gross Weight (Gr. Wt.)'] ? f['Gross Weight (Gr. Wt.)'] + ' g' : '',
       price: effectivePrice,
       qty: item.qty || 1
     };
@@ -1271,6 +1273,7 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
         <td>${item.jobNo}</td>
         <td>${item.purity}</td>
         <td>${item.setCts}</td>
+        <td>${item.grossWeight}</td>
         <td contenteditable="true" data-role="qty" oninput="recalcTotals()" onblur="recalcTotals()">${item.qty}</td>
         <td contenteditable="true" data-role="price" oninput="recalcTotals()" onblur="recalcTotals()">${item.price.toFixed(2)}</td>
         <td data-role="line-total">${(item.price * item.qty).toFixed(2)}</td>
@@ -1304,10 +1307,10 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
     .meta { text-align: right; }
     .meta div { margin-bottom: 6px; }
     .editable { padding: 2px 4px; border-bottom: 1px dashed #999; min-width: 40px; display: inline-block; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.78em; }
+    th, td { border: 1px solid #ddd; padding: 5px 6px; text-align: left; white-space: nowrap; }
     th { background: #f8f9fa; }
-    .image-cell img { width: 50px; height: 50px; object-fit: cover; }
+    .image-cell img { width: 36px; height: 36px; object-fit: cover; }
     .summary { margin-top: 20px; display: flex; justify-content: flex-end; }
     .summary table { width: 340px; }
     .summary td { border: none; padding: 6px 8px; }
@@ -1352,7 +1355,8 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
         <th>Design No</th>
         <th>Job No</th>
         <th>Purity</th>
-        <th>Set Cts</th>
+        <th>Total Dia. Wt</th>
+        <th>Gross Wt</th>
         <th>Qty</th>
         <th>Price (CAD)</th>
         <th>Total (CAD)</th>
