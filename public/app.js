@@ -1498,6 +1498,178 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
   `;
 }
 
+// Sales stats section (called from renderDashboard)
+function renderSalesStats(items, fmt, sectionTitle) {
+  const soldItems = items.filter(i => i.fields['Sold'] && i.fields['Sale Date']);
+  if (soldItems.length === 0) {
+    return `<div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-top:1.5em;">
+      ${sectionTitle('Sales')}
+      <p style="color:#999;font-size:0.9em;">No sold items with a Sale Date recorded yet.</p>
+    </div>`;
+  }
+
+  const now = new Date();
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const today = startOfDay(now);
+  const startOfWeek = new Date(today); startOfWeek.setDate(today.getDate() - today.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+  const salePrice = i => parseFloat(i.fields['Sale Price']) || 0;
+  const saleDate = i => new Date(i.fields['Sale Date']);
+
+  const filter = (from) => soldItems.filter(i => saleDate(i) >= from);
+  const revenue = arr => arr.reduce((s, i) => s + salePrice(i), 0);
+  const tagValue = arr => arr.reduce((s, i) => s + (parseFloat(i.fields['Tag Price Rounded (CAD)']) || 0), 0);
+
+  const todayItems = filter(today);
+  const weekItems  = filter(startOfWeek);
+  const monthItems = filter(startOfMonth);
+  const yearItems  = filter(startOfYear);
+  const allSold    = soldItems;
+
+  // Sales by month for the last 12 months
+  const monthlyMap = {};
+  soldItems.forEach(i => {
+    const d = saleDate(i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthlyMap[key]) monthlyMap[key] = { count: 0, revenue: 0 };
+    monthlyMap[key].count++;
+    monthlyMap[key].revenue += salePrice(i);
+  });
+  const monthlyRows = Object.entries(monthlyMap)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 12);
+  const maxMonthRev = Math.max(...monthlyRows.map(([, v]) => v.revenue), 1);
+
+  // Top customers
+  const customerMap = {};
+  soldItems.forEach(i => {
+    const name = i.fields['Buyer Name'] || 'Unknown';
+    if (!customerMap[name]) customerMap[name] = { count: 0, revenue: 0 };
+    customerMap[name].count++;
+    customerMap[name].revenue += salePrice(i);
+  });
+  const topCustomers = Object.entries(customerMap)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
+    .slice(0, 8);
+
+  // Top selling designs
+  const soldDesignMap = {};
+  soldItems.forEach(i => {
+    const d = i.fields['Design'] || 'Unknown';
+    if (!soldDesignMap[d]) soldDesignMap[d] = { count: 0, revenue: 0 };
+    soldDesignMap[d].count++;
+    soldDesignMap[d].revenue += salePrice(i);
+  });
+  const topSoldDesigns = Object.entries(soldDesignMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 8);
+
+  // Recent sales (last 10)
+  const recentSales = [...soldItems]
+    .sort((a, b) => saleDate(b) - saleDate(a))
+    .slice(0, 10);
+
+  const periodCard = (label, arr) => {
+    const rev = revenue(arr);
+    const tag = tagValue(arr);
+    const margin = tag > 0 ? ((rev - tag) / tag * 100).toFixed(1) : '—';
+    return `<div style="background:#fff;border-radius:10px;padding:1.2em;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.08);flex:1;min-width:130px;">
+      <div style="font-size:0.75em;text-transform:uppercase;letter-spacing:0.05em;color:#888;margin-bottom:0.4em;">${label}</div>
+      <div style="font-size:1.5em;font-weight:bold;color:#28a745;">${fmt(rev)}</div>
+      <div style="font-size:0.8em;color:#666;margin-top:0.2em;">${arr.length} piece${arr.length !== 1 ? 's' : ''}</div>
+      <div style="font-size:0.75em;color:${parseFloat(margin) >= 0 ? '#28a745' : '#dc3545'};margin-top:0.2em;">${margin !== '—' ? (parseFloat(margin) >= 0 ? '+' : '') + margin + '% vs tag' : ''}</div>
+    </div>`;
+  };
+
+  const monthName = key => {
+    const [y, m] = key.split('-');
+    return new Date(y, m - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+  };
+
+  return `
+    ${sectionTitle('Sales Performance')}
+
+    <div style="display:flex;gap:1em;flex-wrap:wrap;margin-bottom:1.5em;">
+      ${periodCard('Today', todayItems)}
+      ${periodCard('This Week', weekItems)}
+      ${periodCard('This Month', monthItems)}
+      ${periodCard('This Year', yearItems)}
+      ${periodCard('All Time', allSold)}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5em;">
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('Monthly Revenue (Last 12 Months)')}
+        ${monthlyRows.map(([key, v]) => {
+          const barPct = Math.round(v.revenue / maxMonthRev * 100);
+          return `<div style="display:flex;align-items:center;gap:0.75em;margin-bottom:0.6em;font-size:0.88em;">
+            <div style="width:52px;color:#555;flex-shrink:0;">${monthName(key)}</div>
+            <div style="flex:1;background:#e9ecef;border-radius:4px;height:16px;">
+              <div style="background:#28a745;border-radius:4px;height:16px;width:${barPct}%;"></div>
+            </div>
+            <div style="width:90px;text-align:right;color:#333;">${fmt(v.revenue)}</div>
+            <div style="width:36px;text-align:right;color:#888;">${v.count}pc</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('Top Customers')}
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+          <thead><tr style="border-bottom:2px solid #dee2e6;">
+            <th style="padding:0.5em 0.8em;text-align:left;">Customer</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">Pieces</th>
+            <th style="padding:0.5em 0.8em;text-align:right;">Revenue</th>
+          </tr></thead>
+          <tbody>${topCustomers.map(([name, v]) => `<tr>
+            <td style="padding:0.5em 0.8em;">${name}</td>
+            <td style="padding:0.5em 0.8em;text-align:center;">${v.count}</td>
+            <td style="padding:0.5em 0.8em;text-align:right;">${fmt(v.revenue)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('Top Selling Designs')}
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+          <thead><tr style="border-bottom:2px solid #dee2e6;">
+            <th style="padding:0.5em 0.8em;text-align:left;">Design</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">Sold</th>
+            <th style="padding:0.5em 0.8em;text-align:right;">Revenue</th>
+          </tr></thead>
+          <tbody>${topSoldDesigns.map(([d, v]) => `<tr>
+            <td style="padding:0.5em 0.8em;font-family:monospace;">${d}</td>
+            <td style="padding:0.5em 0.8em;text-align:center;">${v.count}</td>
+            <td style="padding:0.5em 0.8em;text-align:right;">${fmt(v.revenue)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('Recent Sales')}
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+          <thead><tr style="border-bottom:2px solid #dee2e6;">
+            <th style="padding:0.5em 0.8em;text-align:left;">Date</th>
+            <th style="padding:0.5em 0.8em;text-align:left;">Design</th>
+            <th style="padding:0.5em 0.8em;text-align:left;">Customer</th>
+            <th style="padding:0.5em 0.8em;text-align:right;">Price</th>
+          </tr></thead>
+          <tbody>${recentSales.map(i => `<tr>
+            <td style="padding:0.5em 0.8em;white-space:nowrap;">${i.fields['Sale Date']}</td>
+            <td style="padding:0.5em 0.8em;font-family:monospace;">${i.fields['Design'] || '—'}</td>
+            <td style="padding:0.5em 0.8em;">${i.fields['Buyer Name'] || '—'}</td>
+            <td style="padding:0.5em 0.8em;text-align:right;">${i.fields['Sale Price'] ? fmt(i.fields['Sale Price']) : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+
+    </div>
+  `;
+}
+
 // Dashboard
 function renderDashboard() {
   const container = document.getElementById('dashboardContent');
@@ -1649,6 +1821,8 @@ function renderDashboard() {
         }).join('')}</tbody>
       </table>
     </div>
+
+    ${renderSalesStats(items, fmt, sectionTitle)}
   `;
 }
 
