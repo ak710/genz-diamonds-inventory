@@ -267,6 +267,10 @@ function switchTab(tab) {
     document.querySelector('.tab:nth-child(5)').classList.add('active');
     document.getElementById('invoiceTab').classList.add('active');
     document.getElementById('invoiceScan').focus();
+  } else if (tab === 'dashboard') {
+    document.querySelector('.tab:nth-child(6)').classList.add('active');
+    document.getElementById('dashboardTab').classList.add('active');
+    renderDashboard();
   }
 }
 
@@ -1491,6 +1495,160 @@ function buildInvoiceHtml({ items, customerName, customerPhone = '', customerEma
   </script>
 </body>
 </html>
+  `;
+}
+
+// Dashboard
+function renderDashboard() {
+  const container = document.getElementById('dashboardContent');
+  if (!container) return;
+
+  if (allItems.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#999;padding:3em;">No inventory data loaded yet. Visit Browse All first.</p>';
+    return;
+  }
+
+  const items = allItems;
+
+  // --- core counts ---
+  const total = items.length;
+  const sold = items.filter(i => i.fields['Sold']).length;
+  const inStock = total - sold;
+
+  // --- unique designs ---
+  const designMap = {};
+  items.forEach(i => {
+    const d = i.fields['Design'] || 'Unknown';
+    if (!designMap[d]) designMap[d] = { total: 0, inStock: 0, price: i.fields['Tag Price Rounded (CAD)'] || 0 };
+    designMap[d].total++;
+    if (!i.fields['Sold']) designMap[d].inStock++;
+  });
+  const uniqueDesigns = Object.keys(designMap).length;
+
+  // --- by purity ---
+  const purityMap = {};
+  items.forEach(i => {
+    const p = (i.fields['Purity'] || 'Unknown').split(' ')[0];
+    if (!purityMap[p]) purityMap[p] = { total: 0, inStock: 0 };
+    purityMap[p].total++;
+    if (!i.fields['Sold']) purityMap[p].inStock++;
+  });
+
+  // --- by product type ---
+  const typeLabels = { rn: 'Rings', er: 'Earrings', nt: 'Necklaces/Pendants', br: 'Bracelets' };
+  const typeMap = {};
+  items.forEach(i => {
+    const design = (i.fields['Design'] || '').toLowerCase();
+    let type = 'Other';
+    for (const [code, label] of Object.entries(typeLabels)) {
+      if (design.includes(code)) { type = label; break; }
+    }
+    if (!typeMap[type]) typeMap[type] = { total: 0, inStock: 0 };
+    typeMap[type].total++;
+    if (!i.fields['Sold']) typeMap[type].inStock++;
+  });
+
+  // --- value estimates ---
+  const totalValue = items.reduce((s, i) => s + (i.fields['Tag Price Rounded (CAD)'] || 0), 0);
+  const stockValue = items.filter(i => !i.fields['Sold']).reduce((s, i) => s + (i.fields['Tag Price Rounded (CAD)'] || 0), 0);
+
+  // --- top designs by stock ---
+  const topDesigns = Object.entries(designMap)
+    .filter(([, v]) => v.inStock > 0)
+    .sort((a, b) => b[1].inStock - a[1].inStock)
+    .slice(0, 10);
+
+  const fmt = n => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const statBox = (value, label, color = '#007bff') =>
+    `<div style="background:#fff;border-radius:10px;padding:1.5em;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.08);flex:1;min-width:140px;">
+      <div style="font-size:2em;font-weight:bold;color:${color};">${value}</div>
+      <div style="color:#666;font-size:0.85em;margin-top:0.4em;">${label}</div>
+    </div>`;
+
+  const tableRow = (label, inStock, total) => {
+    const pct = total > 0 ? Math.round(inStock / total * 100) : 0;
+    return `<tr>
+      <td style="padding:0.6em 0.8em;">${label}</td>
+      <td style="padding:0.6em 0.8em;text-align:center;">${inStock}</td>
+      <td style="padding:0.6em 0.8em;text-align:center;">${total}</td>
+      <td style="padding:0.6em 0.8em;">
+        <div style="background:#e9ecef;border-radius:4px;height:8px;width:100%;">
+          <div style="background:#007bff;border-radius:4px;height:8px;width:${pct}%;"></div>
+        </div>
+      </td>
+    </tr>`;
+  };
+
+  const sectionTitle = t => `<h3 style="margin:1.5em 0 0.75em;font-size:1em;text-transform:uppercase;letter-spacing:0.05em;color:#555;">${t}</h3>`;
+
+  container.innerHTML = `
+    <h2 style="margin:0 0 1.5em;">Inventory Dashboard</h2>
+
+    ${sectionTitle('Overview')}
+    <div style="display:flex;gap:1em;flex-wrap:wrap;margin-bottom:1em;">
+      ${statBox(inStock + ' / ' + total, 'Pieces in Stock / Total', '#007bff')}
+      ${statBox(uniqueDesigns, 'Unique Designs', '#6f42c1')}
+      ${statBox(sold, 'Pieces Sold', '#dc3545')}
+      ${statBox(fmt(stockValue), 'Stock Value (CAD)', '#28a745')}
+      ${statBox(fmt(totalValue), 'Total Inventory Value (CAD)', '#fd7e14')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5em;margin-top:1em;">
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('By Product Type')}
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+          <thead><tr style="border-bottom:2px solid #dee2e6;">
+            <th style="padding:0.5em 0.8em;text-align:left;">Type</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">In Stock</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">Total</th>
+            <th style="padding:0.5em 0.8em;">Stock %</th>
+          </tr></thead>
+          <tbody>${Object.entries(typeMap).sort((a,b)=>b[1].total-a[1].total).map(([l,v])=>tableRow(l,v.inStock,v.total)).join('')}</tbody>
+        </table>
+      </div>
+
+      <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+        ${sectionTitle('By Purity')}
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+          <thead><tr style="border-bottom:2px solid #dee2e6;">
+            <th style="padding:0.5em 0.8em;text-align:left;">Purity</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">In Stock</th>
+            <th style="padding:0.5em 0.8em;text-align:center;">Total</th>
+            <th style="padding:0.5em 0.8em;">Stock %</th>
+          </tr></thead>
+          <tbody>${Object.entries(purityMap).sort((a,b)=>b[1].total-a[1].total).map(([l,v])=>tableRow(l,v.inStock,v.total)).join('')}</tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <div style="background:#fff;border-radius:10px;padding:1.5em;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-top:1.5em;">
+      ${sectionTitle('Top Designs by Stock Remaining')}
+      <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+        <thead><tr style="border-bottom:2px solid #dee2e6;">
+          <th style="padding:0.5em 0.8em;text-align:left;">Design</th>
+          <th style="padding:0.5em 0.8em;text-align:center;">In Stock</th>
+          <th style="padding:0.5em 0.8em;text-align:center;">Total</th>
+          <th style="padding:0.5em 0.8em;text-align:right;">Tag Price (CAD)</th>
+          <th style="padding:0.5em 0.8em;">Stock %</th>
+        </tr></thead>
+        <tbody>${topDesigns.map(([design, v]) => {
+          const pct = v.total > 0 ? Math.round(v.inStock / v.total * 100) : 0;
+          return `<tr>
+            <td style="padding:0.6em 0.8em;font-family:monospace;">${design}</td>
+            <td style="padding:0.6em 0.8em;text-align:center;">${v.inStock}</td>
+            <td style="padding:0.6em 0.8em;text-align:center;">${v.total}</td>
+            <td style="padding:0.6em 0.8em;text-align:right;">${v.price ? fmt(v.price) : '—'}</td>
+            <td style="padding:0.6em 0.8em;">
+              <div style="background:#e9ecef;border-radius:4px;height:8px;width:100%;">
+                <div style="background:#28a745;border-radius:4px;height:8px;width:${pct}%;"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
   `;
 }
 
